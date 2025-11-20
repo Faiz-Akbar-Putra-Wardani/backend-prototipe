@@ -1,0 +1,387 @@
+// Import express untuk membuat aplikasi web
+const express = require("express");
+
+// Import prisma client untuk berinteraksi dengan database
+const prisma = require("../prisma/client");
+
+// Import function untuk menghasilkan invoice acak
+const { generateUniqueInvoice } = require('../utils/generateUniqueInvoice');
+
+// Fungsi untuk membuat transaksi
+const createTransaction = async (req, res) => {
+    try {
+
+        // Generate invoice
+        const invoice = await generateUniqueInvoice();
+
+        // Input dari frontend
+        const cashierId = parseInt(req.userId);
+        const customerId = req.body.customer_id ? parseInt(req.body.customer_id) : null;
+        const subtotal = parseFloat(req.body.subtotal) || 0;
+        const subtotalPlusExtra = parseFloat(req.body.subtotalPlusExtra) || 0;
+        const extra = parseFloat(req.body.extra) || 0;
+        const dp = parseFloat(req.body.dp) || 0;
+        const nego = parseFloat(req.body.nego) || 0;
+        const pph = parseFloat(req.body.pph) || 0;
+        const pphNominal = parseFloat(req.body.pph_nominal) || 0;
+        const grandTotal = parseFloat(req.body.grand_total);
+        const status = req.body.status ?? "proses";
+
+        // Validasi wajib
+        if (isNaN(cashierId) || isNaN(grandTotal)) {
+            return res.status(400).json({
+                meta: {
+                    success: false,
+                    message: "Input tidak valid. Periksa kembali data transaksi.",
+                },
+            });
+        }
+
+        // 1. Simpan transaksi utama
+        const transaction = await prisma.transaction.create({
+            data: {
+                cashier_id: cashierId,
+                customer_id: customerId,
+                invoice,
+                subtotal,
+                subtotalPlusExtra,
+                extra,
+                dp,
+                nego,
+                pph,
+                pph_nominal: pphNominal,
+                grand_total: grandTotal,
+                status,
+            },
+        });
+
+        // 2. Ambil semua cart milik kasir
+        const carts = await prisma.cart.findMany({
+            where: { cashier_id: cashierId },
+            include: { product: true },
+        });
+
+        // Jika cart kosong, hentikan
+        if (carts.length === 0) {
+            return res.status(400).json({
+                meta: {
+                    success: false,
+                    message: "Keranjang kosong. Tidak bisa checkout.",
+                },
+            });
+        }
+
+        // 3. Loop item cart → simpan detail + profit + update stok
+        for (const cart of carts) {
+
+            // Simpan detail transaksi
+            await prisma.transactionDetail.create({
+                data: {
+                    transaction_id: transaction.id,
+                    product_id: cart.product_id,
+                    qty: cart.qty,
+                    price: parseFloat(cart.price),
+                },
+            });
+
+            // Hitung total jual (untuk profit)
+            const totalSellPrice = cart.product.sell_price * cart.qty;
+
+            // Simpan profit (INI YANG ERROR KEMARIN)
+            await prisma.profit.create({
+            data: {
+                transaction_id: transaction.id,
+                total: totalSellPrice,
+                source: "sale",
+            },
+            });
+
+            // Update stok
+            // await prisma.product.update({
+            //     where: { id: cart.product_id },
+            //     data: { stock: { decrement: cart.qty } },
+            // });
+        }
+
+        // 4. Bersihkan cart kasir
+        await prisma.cart.deleteMany({
+            where: { cashier_id: cashierId },
+        });
+
+        // Response sukses
+        res.status(201).json({
+            meta: {
+                success: true,
+                message: "Transaksi berhasil dibuat",
+            },
+            data: transaction,
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            meta: {
+                success: false,
+                message: "Terjadi kesalahan pada server",
+            },
+            errors: error.message,
+        });
+    }
+};
+
+
+const getTransactions = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const perPage = 5;
+    const search = req.query.search || "";
+
+    const where = search
+      ? {
+          OR: [
+            { invoice: { contains: search, mode: "insensitive" } },
+            {
+              customer: {
+                name_perusahaan: { contains: search, mode: "insensitive" }
+              }
+            }
+          ]
+        }
+      : {};
+
+    // Hitung total data
+    const total = await prisma.transaction.count({ where });
+
+    // Ambil transaksi dengan pagination + relasi
+    const transactions = await prisma.transaction.findMany({
+      where,
+      include: {
+        customer: true,
+        cashier: true,
+        transaction_details: {
+          include: { product: true },
+        },
+      },
+      skip: (page - 1) * perPage,
+      take: perPage,
+      orderBy: { id: "desc" },
+    });
+
+    res.status(200).json({
+      meta: {
+        success: true,
+        message: "Data transaksi berhasil diambil",
+        pagination: {
+          currentPage: page,
+          perPage,
+          total,
+          totalPages: Math.ceil(total / perPage),
+        },
+      },
+      data: transactions,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      meta: {
+        success: false,
+        message: "Terjadi kesalahan pada server",
+      },
+      errors: error.message,
+    });
+  }
+};
+
+
+const getTransactionById = async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+
+        if (isNaN(id)) {
+            return res.status(400).json({
+                meta: {
+                    success: false,
+                    message: "ID transaksi tidak valid",
+                },
+            });
+        }
+
+        const transaction = await prisma.transaction.findUnique({
+            where: { id },
+            include: {
+                customer: true,
+                cashier: true,
+                transaction_details: {
+                    include: {
+                        product: true,
+                    },
+                },
+            },
+        });
+
+        if (!transaction) {
+            return res.status(404).json({
+                meta: {
+                    success: false,
+                    message: "Transaksi tidak ditemukan",
+                },
+            });
+        }
+
+        res.status(200).json({
+            meta: {
+                success: true,
+                message: "Detail transaksi berhasil diambil",
+            },
+            data: transaction,
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            meta: {
+                success: false,
+                message: "Terjadi kesalahan pada server",
+            },
+            errors: error.message,
+        });
+    }
+};
+const getTransactionByInvoice = async (req, res) => {
+  try {
+    const invoice = req.params.invoice;
+
+    if (!invoice) {
+      return res.status(400).json({
+        meta: { success: false, message: "Invoice wajib diisi" },
+      });
+    }
+
+    const transaction = await prisma.transaction.findUnique({
+      where: { invoice },
+      include: {
+        customer: true,
+        cashier: true,
+        transaction_details: {
+          include: { product: true },
+        },
+      },
+    });
+
+    if (!transaction) {
+      return res.status(404).json({
+        meta: { success: false, message: "Transaksi tidak ditemukan" },
+      });
+    }
+
+    res.status(200).json({
+      meta: {
+        success: true,
+        message: "Transaksi berdasarkan invoice berhasil diambil",
+      },
+      data: transaction,
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      meta: { success: false, message: "Terjadi kesalahan pada server" },
+      errors: error.message,
+    });
+  }
+};
+
+const getNewInvoice = async (req, res) => {
+  try {
+    const invoice = await generateUniqueInvoice();
+
+    res.status(200).json({
+      meta: { success: true, message: "Invoice baru berhasil dibuat" },
+      data: { invoice }
+    });
+  } catch (error) {
+    res.status(500).json({
+      meta: { success: false, message: "Gagal membuat invoice" },
+      errors: error.message
+    });
+  }
+};
+
+const updateStatus = async (req, res) => {
+    try {
+        const { invoice, status } = req.body;
+
+        const trx = await prisma.transaction.update({
+            where: { invoice },
+            data: { status },
+        });
+
+        res.status(200).json({
+            meta: {
+                success: true,
+                message: "Status transaksi berhasil diperbarui",
+            },
+            data: trx,
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            meta: {
+                success: false,
+                message: "Terjadi kesalahan pada server",
+            },
+            errors: error.message,
+        });
+    }
+};
+
+const deleteTransaction = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+
+    if (isNaN(id)) {
+      return res.status(400).json({
+        meta: { success: false, message: "ID tidak valid" },
+      });
+    }
+
+    // Hapus detail transaksi
+    await prisma.transactionDetail.deleteMany({
+      where: { transaction_id: id },
+    });
+
+    // Hapus profit
+    await prisma.profit.deleteMany({
+      where: { transaction_id: id },
+    });
+
+    // Hapus transaksi utama
+    await prisma.transaction.delete({
+      where: { id },
+    });
+
+    res.status(200).json({
+      meta: {
+        success: true,
+        message: "Transaksi berhasil dihapus",
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      meta: { success: false, message: "Gagal menghapus transaksi" },
+      errors: error.message,
+    });
+  }
+};
+
+// Export fungsi
+module.exports = {
+    createTransaction,
+    getTransactions,
+    getTransactionById,
+    getTransactionByInvoice,
+    getNewInvoice,
+    updateStatus,
+    deleteTransaction
+};

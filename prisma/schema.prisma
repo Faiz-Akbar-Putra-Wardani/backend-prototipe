@@ -1,0 +1,224 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               Int           @id @default(autoincrement())
+  name             String
+  email            String
+  password         String
+  created_at       DateTime      @default(now())
+  updated_at       DateTime      @updatedAt
+  transactions     Transaction[]
+  carts            Cart[]
+
+  @@map("users")
+}
+
+model Customer {
+  id               Int           @id @default(autoincrement())
+  name_perusahaan  String
+  no_telp          String
+  address          String
+  created_at       DateTime      @default(now())
+  updated_at       DateTime      @updatedAt
+  transactions     Transaction[]
+  rentals          Rental[]
+  repairs          Repair[]
+ 
+
+  @@map("customers")
+}
+
+model Category {
+  id          Int        @id @default(autoincrement())
+  image       String?
+  name        String
+  created_at  DateTime   @default(now())
+  updated_at  DateTime   @updatedAt
+  products    Product[]
+
+  @@map("categories")
+}
+
+
+model Cart {
+  id          Int       @id @default(autoincrement())
+  cashier_id  Int
+  product_id  Int
+  qty         Int
+  price       Float
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  cashier     User     @relation(fields: [cashier_id], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@map("carts")
+}
+
+model Product {
+  id                  Int                    @id @default(autoincrement())
+  category_id         Int
+  image               String?
+  title               String
+  description         String?
+  sell_price          Float
+  stock               Int
+  created_at          DateTime               @default(now())
+  updated_at          DateTime               @updatedAt
+  category            Category               @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  specifications      ProductSpecification[]
+  transaction_details TransactionDetail[]
+  rentals             Rental[]
+  carts            Cart[]
+  
+
+  @@map("products")
+}
+
+model ProductSpecification {
+  id               Int       @id @default(autoincrement())
+  product_id       Int
+  brand            String
+  model            String
+  cylinder         String
+  piston_displ     String
+  rated_speed      String
+  bore_stroke      String
+  governor         String
+  aspiration       String
+  oil_capacity     String
+  fuel_capacity    String
+  cooling_system   String
+  load_100         Float
+  load_75          Float
+  load_50          Float
+  prime_power      String
+  standby_power    String
+  voltage          String
+  alternator       String
+  dimension_open   String
+  weight_open      String
+  dimension_silent String
+  weight_silent    String
+  created_at       DateTime  @default(now())
+  updated_at DateTime @updatedAt @default(now())
+  product          Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@map("product_specifications")
+}
+
+model Transaction {
+  id                  Int                  @id @default(autoincrement())
+  cashier_id          Int
+  customer_id         Int?
+  invoice             String               @unique
+  subtotal            Float 
+  subtotalPlusExtra   Float @map("subExtraValue") 
+  extra               Float?                @default(0)
+  dp                  Float
+  nego                Float
+  pph                 Float?                @default(0)
+  pph_nominal         Float?                @default(0)
+  grand_total         Float
+  status              String               
+  created_at          DateTime             @default(now())
+  cashier             User                 @relation(fields: [cashier_id], references: [id], onDelete: Cascade)
+  customer            Customer?            @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  transaction_details TransactionDetail[]
+  profits             Profit[]
+
+  @@map("transactions")
+}
+
+model TransactionDetail {
+  id              Int          @id @default(autoincrement())
+  transaction_id  Int
+  product_id      Int
+  qty             Int
+  price           Float
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  transaction     Transaction  @relation(fields: [transaction_id], references: [id], onDelete: Cascade)
+  product         Product      @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@map("transaction_details")
+}
+
+model Rental {
+  id           Int       @id @default(autoincrement())
+  customer_id  Int
+  product_id   Int
+  invoice      String     @unique
+  start_date   DateTime
+  end_date     DateTime
+  agreement    String
+  rent_price   Float
+  status       String      // ongoing, returned, late, cancelled
+  created_at   DateTime    @default(now())
+  updated_at   DateTime    @updatedAt
+  customer     Customer    @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  product      Product     @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  profits      Profit[]
+
+  @@map("rentals")
+}
+
+model Repair {
+  id           Int       @id @default(autoincrement())
+  customer_id  Int
+  custom_item  String?
+  invoice      String     @unique
+  start_date   DateTime
+  end_date     DateTime
+  description  String
+  repair_cost  Float
+  status       String      // process, completed
+  created_at   DateTime    @default(now())
+  updated_at   DateTime    @updatedAt
+  customer     Customer    @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  profits      Profit[]
+
+  @@map("repairs")
+}
+
+model Profit {
+  id             Int        @id @default(autoincrement())
+  source         String      // sale, rental, repair
+  transaction_id Int?        // untuk penjualan
+  rental_id      Int?        // untuk sewa
+  repair_id      Int?        // untuk perbaikan
+  total          Float
+  created_at     DateTime    @default(now())
+
+  transaction    Transaction? @relation(fields: [transaction_id], references: [id])
+  rental         Rental?      @relation(fields: [rental_id], references: [id])
+  repair         Repair?      @relation(fields: [repair_id], references: [id])
+
+  @@map("profits")
+}
+
+model Project {
+  id           Int       @id @default(autoincrement())
+  image        String?
+  project_name String
+  location     String
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+
+  @@map("projects")
+}
+
+model Partnership {
+  id           Int       @id @default(autoincrement())
+  image        String?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+
+  @@map("partnerships")
+}
