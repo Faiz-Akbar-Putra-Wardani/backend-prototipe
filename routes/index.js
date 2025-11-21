@@ -3,7 +3,7 @@ const express = require('express');
 
 const router = express.Router();
 
-const { validateLogin, validateCustomer, validateCategory, validateProduct, validateDetailProduct, validateCart, validateTransaction} = require('../utils/validators');
+const { validateLogin, validateCustomer, validateCategory, validateProduct, validateDetailProduct, validateCart, validateTransaction, validateRental } = require('../utils/validators');
 const { handleValidationErrors, verifyToken, upload} = require('../middlewares');
 
 const loginController = require('../controllers/LoginController');
@@ -13,6 +13,7 @@ const productController = require('../controllers/ProductController');
 const detailProductController = require('../controllers/DetailProductController');
 const cartController = require('../controllers/CartController');
 const transactionController = require('../controllers/TransactionController');
+const rentalController = require('../controllers/RentalController');
 
 const routes = [
   // Login 
@@ -72,13 +73,69 @@ const routes = [
   middlewares: [verifyToken],
   handler: transactionController.getTransactionByInvoice
 },
-{ method: 'put', path: '/transactions/:id/status', middlewares: [verifyToken], handler: transactionController.updateStatus },
+{ method: 'put', path: '/transactions/status', middlewares: [verifyToken], handler: transactionController.updateStatus },
 
 { 
   method: 'get',path: '/transactions/:id',middlewares: [verifyToken], handler: transactionController.getTransactionById 
 },
 { method: "delete", path: "/transactions/:id", middlewares: [verifyToken], handler: transactionController.deleteTransaction },
 
+ {
+    method: 'post',
+    path: '/rentals',
+    middlewares: [verifyToken, validateRental, handleValidationErrors],
+    handler: rentalController.createRental
+  },
+
+  // Get All Rentals (with pagination + search)
+  {
+    method: 'get',
+    path: '/rentals',
+    middlewares: [verifyToken],
+    handler: rentalController.getRentals
+  },
+
+  // Get Rental By ID
+  {
+    method: 'get',
+    path: '/rentals/:id',
+    middlewares: [verifyToken],
+    handler: rentalController.getRentalById
+  },
+
+   // Get New Invoice
+  {
+    method: 'get',
+    path: '/rentals/invoice/new',
+    middlewares: [verifyToken],
+    handler: rentalController.getNewInvoice
+  },
+
+  // Get Rental By Invoice
+  {
+    method: 'get',
+    path: '/rentals/invoice/:invoice',
+    middlewares: [verifyToken],
+    handler: rentalController.getRentalByInvoice
+  },
+
+ 
+
+  // Update Rental Status
+  {
+    method: 'put',
+    path: '/rentals/:id/status',
+    middlewares: [verifyToken],
+    handler: rentalController.updateRentalStatus
+  },
+
+  // Delete Rental
+  {
+    method: 'delete',
+    path: '/rentals/:id',
+    middlewares: [verifyToken],
+    handler: rentalController.deleteRental
+  }
 
 
 ];

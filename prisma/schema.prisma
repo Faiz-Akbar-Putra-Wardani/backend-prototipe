@@ -74,7 +74,7 @@ model Product {
   category            Category               @relation(fields: [category_id], references: [id], onDelete: Cascade)
   specifications      ProductSpecification[]
   transaction_details TransactionDetail[]
-  rentals             Rental[]
+  rental_details      RentalDetail[]    
   carts            Cart[]
   
 
@@ -153,21 +153,38 @@ model TransactionDetail {
 model Rental {
   id           Int       @id @default(autoincrement())
   customer_id  Int
-  product_id   Int
   invoice      String     @unique
   start_date   DateTime
   end_date     DateTime
-  agreement    String
+  dp           Float?     @default(0)
   rent_price   Float
   status       String      // ongoing, returned, late, cancelled
   created_at   DateTime    @default(now())
   updated_at   DateTime    @updatedAt
   customer     Customer    @relation(fields: [customer_id], references: [id], onDelete: Cascade)
-  product      Product     @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  details      RentalDetail[]
   profits      Profit[]
 
   @@map("rentals")
 }
+
+model RentalDetail {
+  id          Int       @id @default(autoincrement())
+  rental_id   Int
+  product_id  Int
+  qty         Int       @default(1)
+  rent_price  Float
+  start_date  DateTime
+  end_date    DateTime
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  rental      Rental    @relation(fields: [rental_id], references: [id], onDelete: Cascade)
+  product     Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@map("rental_details")
+}
+
 
 model Repair {
   id           Int       @id @default(autoincrement())

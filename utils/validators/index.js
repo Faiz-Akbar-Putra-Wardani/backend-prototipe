@@ -5,5 +5,6 @@ const { validateProduct } = require("./product");
 const { validateDetailProduct } = require("./detail-product");
 const { validateCart } = require("./cart");
 const { validateTransaction } = require("./transaction");
+const { validateRental } = require("./rental");
 
-module.exports = { validateLogin, validateCustomer, validateCategory, validateProduct, validateDetailProduct, validateCart, validateTransaction };
+module.exports = { validateLogin, validateCustomer, validateCategory, validateProduct, validateDetailProduct, validateCart, validateTransaction, validateRental };

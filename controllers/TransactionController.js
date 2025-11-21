@@ -25,7 +25,7 @@ const createTransaction = async (req, res) => {
         const pph = parseFloat(req.body.pph) || 0;
         const pphNominal = parseFloat(req.body.pph_nominal) || 0;
         const grandTotal = parseFloat(req.body.grand_total);
-        const status = req.body.status ?? "proses";
+        const status = req.body.status;
 
         // Validasi wajib
         if (isNaN(cashierId) || isNaN(grandTotal)) {
@@ -308,32 +308,52 @@ const getNewInvoice = async (req, res) => {
 };
 
 const updateStatus = async (req, res) => {
-    try {
-        const { invoice, status } = req.body;
+  try {
+    const { invoice, status } = req.body;
 
-        const trx = await prisma.transaction.update({
-            where: { invoice },
-            data: { status },
-        });
-
-        res.status(200).json({
-            meta: {
-                success: true,
-                message: "Status transaksi berhasil diperbarui",
-            },
-            data: trx,
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({
-            meta: {
-                success: false,
-                message: "Terjadi kesalahan pada server",
-            },
-            errors: error.message,
-        });
+    if (!invoice || !status) {
+      return res.status(400).json({
+        meta: { success: false, message: "Invoice dan status wajib diisi" },
+      });
     }
+
+    // Cek apakah transaksi ada
+    const exist = await prisma.transaction.findUnique({
+      where: { invoice },
+    });
+
+    if (!exist) {
+      return res.status(404).json({
+        meta: { success: false, message: "Transaksi tidak ditemukan" },
+      });
+    }
+
+    // Update status
+    const trx = await prisma.transaction.update({
+      where: { invoice },
+      data: { status },
+    });
+
+    res.status(200).json({
+      meta: {
+        success: true,
+        message: "Status transaksi berhasil diperbarui",
+      },
+      data: trx,
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      meta: {
+        success: false,
+        message: "Terjadi kesalahan pada server",
+      },
+      errors: error.message,
+    });
+  }
 };
+
 
 const deleteTransaction = async (req, res) => {
   try {
