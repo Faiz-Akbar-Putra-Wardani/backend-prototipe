@@ -124,7 +124,7 @@ const routes = [
   // Update Rental Status
   {
     method: 'put',
-    path: '/rentals/:id/status',
+    path: '/rentals/status',
     middlewares: [verifyToken],
     handler: rentalController.updateRentalStatus
   },

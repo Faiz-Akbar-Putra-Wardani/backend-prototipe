@@ -252,26 +252,52 @@ const getNewInvoice = async (req, res) => {
 
 // UPDATE RENTAL STATUS
 const updateRentalStatus = async (req, res) => {
-    try {
-        const { invoice, status } = req.body;
+  try {
+    const { invoice, status } = req.body;
 
-        const updated = await prisma.rental.update({
-            where: { invoice },
-            data: { status },
-        });
-
-        res.status(200).json({
-            meta: { success: true, message: "Status rental berhasil diperbarui" },
-            data: updated,
-        });
-
-    } catch (error) {
-        res.status(500).json({
-            meta: { success: false, message: "Terjadi kesalahan server" },
-            errors: error.message,
-        });
+    if (!invoice || !status) {
+      return res.status(400).json({
+        meta: { success: false, message: "Invoice dan status wajib diisi" },
+      });
     }
+
+    // Cek apakah transaksi ada
+    const exist = await prisma.rental.findUnique({
+      where: { invoice },
+    });
+
+    if (!exist) {
+      return res.status(404).json({
+        meta: { success: false, message: "Transaksi tidak ditemukan" },
+      });
+    }
+
+    // Update status
+    const trx = await prisma.rental.update({
+      where: { invoice },
+      data: { status },
+    });
+
+    res.status(200).json({
+      meta: {
+        success: true,
+        message: "Status transaksi berhasil diperbarui",
+      },
+      data: trx,
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      meta: {
+        success: false,
+        message: "Terjadi kesalahan pada server",
+      },
+      errors: error.message,
+    });
+  }
 };
+
 
 
 // DELETE RENTAL

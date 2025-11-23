@@ -2,8 +2,8 @@ const { body } = require('express-validator');
 
 // Definisikan validasi untuk create transaction
 const validateRental = [
-    body("customer_id")
-    .notEmpty().withMessage("Pelanggan wajib diisi"),
+    // body("customer_id")
+    // .notEmpty().withMessage("Pelanggan wajib diisi"),
 
      body("start_date")
     .notEmpty().withMessage("start_date wajib diisi")
