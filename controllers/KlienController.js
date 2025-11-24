@@ -1,62 +1,47 @@
-// Import express
 const express = require("express");
-
-// Import prisma client
 const prisma = require("../prisma/client");
-
-// Import fs
 const fs = require("fs");
-const findCategories = async (req, res) => {
+
+const findClients = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 5;
         const skip = (page - 1) * limit;
-
         const search = req.query.search || '';
 
-        const categories = await prisma.category.findMany({
-            where: {
-                name: {
-                    contains: search, 
-                },
+        const clients = await prisma.partnership.findMany({
+           where: {
+            name:{
+                contains: search,
             },
-            select: {
+           },
+           select: {
                 id: true,
                 name: true,
                 image: true,
                 created_at: true,
                 updated_at: true,
-            },
-            orderBy: {
-                id: "desc",
-            },
-            skip: skip,
-            take: limit,
+           },
+           orderBy: {
+            id: "desc",
+           },
+           skip: skip,
+           take: limit,
         });
 
-        const totalCategories = await prisma.category.count({
+        const totalClients = await prisma.partnership.count({
             where: {
                 name: {
-                    contains: search, 
+                    contains: search,
                 },
             },
         });
-
-        const totalPages = Math.ceil(totalCategories / limit);
+        const totalPages = Math.ceil(totalClients / limit);
 
         res.status(200).send({
-            
-            meta: {
-                success: true,
-                message: "Berhasil mendapatkan semua kategori",
-            },
-            data: categories,
-            pagination: {
-                currentPage: page,
-                totalPages: totalPages,
-                perPage: limit,
-                total: totalCategories,
-            },
+            data: clients,
+            total_data: totalClients,
+            total_page: totalPages,
         });
     } catch (error) {
         res.status(500).send({
@@ -64,30 +49,27 @@ const findCategories = async (req, res) => {
                 success: false,
                 message: "Terjadi kesalahan di server",
             },
-            errors: error,
         });
     }
 };
 
-// Fungsi createCategory
-const createCategory = async (req, res) => {
+const createClient = async (req, res) => {
     try {
-        // Masukkan data kategori baru
-        const category = await prisma.category.create({
+        const client = await prisma.partnership.create({
             data: {
                 name: req.body.name,
                 image: req.file.path,
-            },
+            }
         });
 
         res.status(201).send({
             meta: {
-                success: true,
-                message: "Kategori berhasil dibuat",
+                succces: true,
+                message: "Klien berhasil dibuat",
             },
-            data: category,
+            data: client,
         });
-    } catch (error) {
+    } catch(error){
         res.status(500).send({
             meta: {
                 success: false,
@@ -98,14 +80,11 @@ const createCategory = async (req, res) => {
     }
 };
 
-// Fungsi findCategoryById
-const findCategoryById = async (req, res) => {
-   
-    const { id } = req.params;
-
+const findClientsById = async (req, res) => {
     try {
-        
-        const category = await prisma.category.findUnique({
+        const { id } = req.params;
+
+        const client = await prisma.partnership.findUnique({
             where: {
                 id: Number(id),
             },
@@ -118,23 +97,21 @@ const findCategoryById = async (req, res) => {
             },
         });
 
-        if (!category) {
+        if (!client) {
             return res.status(404).send({
-
                 meta: {
                     success: false,
-                    message: `Kategori dengan ID: ${id} tidak ditemukan`,
+                    message: `Klien dengan ID: ${id} tidak ditemukan`,
                 },
             });
         }
 
-        // Kirim respons
         res.status(200).send({
             meta: {
                 success: true,
-                message: `Berhasil mendapatkan kategori dengan ID: ${id}`,
+                message: "Berhasil mengambil klien",
             },
-            data: category,
+            data: client,
         });
     } catch (error) {
         res.status(500).send({
@@ -147,46 +124,42 @@ const findCategoryById = async (req, res) => {
     }
 };
 
-// Fungsi updateCategory
-const updateCategory = async (req, res) => {
+const updateClient = async (req, res) => {
     
     const { id } = req.params;
 
     try {
-        // Update kategori dengan atau tanpa gambar
-        const dataCategory = {
+        const dataClient = {
             name: req.body.name,
             updated_at: new Date(),
         };
         if (req.file) {
 
-            dataCategory.image = req.file.path;
+            dataClient.image = req.file.path;
 
-            const category = await prisma.category.findUnique({
+            const client = await prisma.partnership.findUnique({
                 where: {
                     id: Number(id),
                 },
             });
 
-            if (category.image) {
-                // Hapus gambar lama
-                fs.unlinkSync(category.image);
+            if (client.image) {
+                fs.unlinkSync(client.image);
             }
         }
 
-        const category = await prisma.category.update({
+        const client = await prisma.partnership.update({
             where: {
                 id: Number(id),
             },
-            data: dataCategory,
+            data: dataClient,
         });
-
         res.status(200).send({
             meta: {
                 success: true,
-                message: "Kategori berhasil diperbarui",
+                message: "Klien berhasil diperbarui",
             },
-            data: category,
+            data: client,
         });
     } catch (error) {
         res.status(500).send({
@@ -198,17 +171,17 @@ const updateCategory = async (req, res) => {
         });
     }
 };
-const deleteCategory = async (req, res) => {
+const deleteClient = async (req, res) => {
     const { id } = req.params;
 
     try {
-        const category = await prisma.category.findUnique({
+        const client = await prisma.partnership.findUnique({
             where: {
                 id: Number(id),
             },
         });
 
-        if (!category) {
+        if (!client) {
             return res.status(404).send({
                 meta: {
                     success: false,
@@ -217,14 +190,14 @@ const deleteCategory = async (req, res) => {
             });
         }
 
-        await prisma.category.delete({
+        await prisma.partnership.delete({
             where: {
                 id: Number(id),
             },
         });
 
-        if (category.image) {
-            const imagePath = category.image;
+        if (client.image) {
+            const imagePath = client.image;
             const fileName = imagePath.substring(imagePath.lastIndexOf("/") + 1);
             const filePath = `uploads/${fileName}`;
             if (fs.existsSync(filePath)) {
@@ -235,7 +208,7 @@ const deleteCategory = async (req, res) => {
         res.status(200).send({
             meta: {
                 success: true,
-                message: "Kategori berhasil dihapus",
+                message: "Klien berhasil dihapus",
             },
         });
     } catch (error) {
@@ -248,10 +221,10 @@ const deleteCategory = async (req, res) => {
         });
     }
 };
-const allCategories = async (req, res) => {
+const allClients = async (req, res) => {
     try {
         
-        const categories = await prisma.category.findMany({
+        const clients = await prisma.partnership.findMany({
             select: {
                 id: true,
                 name: true,
@@ -264,14 +237,13 @@ const allCategories = async (req, res) => {
             }
         });
 
-        // Kirim respons
         res.status(200).send({
-            // Meta untuk respons dalam format JSON
+            
             meta: {
                 success: true,
-                message: "Berhasil mendapatkan semua kategori",
+                message: "Berhasil mendapatkan semua klien",
             },
-            data: categories,
+            data: clients
         });
     } catch (error) {
         res.status(500).send({
@@ -284,6 +256,7 @@ const allCategories = async (req, res) => {
     }
 };
 
+
 module.exports = {
-    findCategories, createCategory, findCategoryById, updateCategory, deleteCategory, allCategories
+    findClients, createClient, findClientsById, updateClient, deleteClient, allClients
 };
