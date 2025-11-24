@@ -222,7 +222,7 @@ model Profit {
 
 model Project {
   id           Int       @id @default(autoincrement())
-  image        String?
+  image        String
   project_name String
   location     String
   created_at   DateTime  @default(now())
@@ -232,10 +232,11 @@ model Project {
 }
 
 model Partnership {
-  id           Int       @id @default(autoincrement())
-  image        String?
-  created_at   DateTime  @default(now())
-  updated_at   DateTime  @updatedAt
+  id         Int       @id @default(autoincrement())
+  name       String
+  image      String     
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
 
   @@map("partnerships")
 }
