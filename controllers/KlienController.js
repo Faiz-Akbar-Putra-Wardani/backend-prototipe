@@ -40,9 +40,14 @@ const findClients = async (req, res) => {
 
         res.status(200).send({
             data: clients,
-            total_data: totalClients,
-            total_page: totalPages,
-        });
+            pagination: {
+            currentPage: page,
+            perPage: limit,
+            total: totalClients,
+            totalPage: totalPages
+    }
+});
+
     } catch (error) {
         res.status(500).send({
             meta: {

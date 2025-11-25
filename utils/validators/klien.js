@@ -14,4 +14,4 @@ const validateClient = [
 
 ];
 
-module.exports = { validateProject };
+module.exports = { validateClient };

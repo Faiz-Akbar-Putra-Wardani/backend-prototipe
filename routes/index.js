@@ -3,7 +3,7 @@ const express = require('express');
 
 const router = express.Router();
 
-const { validateLogin, validateCustomer, validateCategory, validateProduct, validateDetailProduct, validateCart, validateTransaction, validateRental, validateProject } = require('../utils/validators');
+const { validateLogin, validateCustomer, validateCategory, validateProduct, validateDetailProduct, validateCart, validateTransaction, validateRental, validateProject, validateClient } = require('../utils/validators');
 const { handleValidationErrors, verifyToken, upload} = require('../middlewares');
 
 const loginController = require('../controllers/LoginController');
@@ -15,6 +15,7 @@ const cartController = require('../controllers/CartController');
 const transactionController = require('../controllers/TransactionController');
 const rentalController = require('../controllers/RentalController');
 const projectController = require('../controllers/ProyekController');
+const clientController = require('../controllers/KlienController');
 
 const routes = [
   // Login 
@@ -322,6 +323,55 @@ const routes = [
     middlewares: [verifyToken],
     handler: projectController.allProjects
   },
+
+    // Client Routes
+  {
+    method: 'get',
+    path: '/clients',
+    middlewares: [verifyToken],
+    handler: clientController.findClients
+  },
+  {
+    method: 'post',
+    path: '/clients',
+    middlewares: [
+      verifyToken,
+      upload.single('image'),
+      validateClient,
+      handleValidationErrors
+    ],
+    handler: clientController.createClient
+  },
+  {
+    method: 'get',
+    path: '/clients/:id',
+    middlewares: [verifyToken],
+    handler: clientController.findClientsById
+  },
+  {
+    method: 'put',
+    path: '/clients/:id',
+    middlewares: [
+      verifyToken,
+      upload.single('image'),
+      validateClient,
+      handleValidationErrors
+    ],
+    handler: clientController.updateClient
+  },
+  {
+    method: 'delete',
+    path: '/clients/:id',
+    middlewares: [verifyToken],
+    handler: clientController.deleteClient
+  },
+  {
+    method: 'get',
+    path: '/clients-all',
+    middlewares: [verifyToken],
+    handler: clientController.allClients
+  },
+
 
 
 
