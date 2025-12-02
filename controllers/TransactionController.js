@@ -37,6 +37,67 @@ const createTransaction = async (req, res) => {
             });
         }
 
+        // VALIDASI PPH
+        const maxPphNominal = subtotalPlusExtra;
+
+        if (pphNominal > maxPphNominal) {
+          return res.status(422).json({
+            meta: {
+              success: false,
+              message: "PPH tidak boleh melebihi total biaya",
+            },
+          });
+        }
+
+        if (pph < 0 || pph > 100) {
+          return res.status(422).json({
+            meta: {
+              success: false,
+              message: "PPH harus berada di antara 0 - 100%",
+            },
+          });
+        }
+
+
+        // VALIDASI DP
+        if (dp > grandTotal) {
+          return res.status(422).json({
+            meta: {
+              success: false,
+              message: "DP tidak boleh melebihi total bayar",
+            },
+          });
+        }
+
+        if (dp < 0) {
+          return res.status(422).json({
+            meta: {
+              success: false,
+              message: "DP tidak boleh kurang dari 0",
+            },
+          });
+        }
+
+        //  VALIDASI NEGO
+          const maxNego = subtotalPlusExtra - pphNominal
+
+          if (nego > maxNego) {
+            return res.status(422).json({
+              meta: {
+                success: false,
+                message: "Harga nego tidak boleh melebihi total sebelum nego",
+              },
+            })
+          }
+
+          if (nego < 0) {
+            return res.status(422).json({
+              meta: {
+                success: false,
+                message: "Harga nego tidak boleh kurang dari 0",
+              },
+            })
+          }
         // 1. Simpan transaksi utama
         const transaction = await prisma.transaction.create({
             data: {

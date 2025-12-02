@@ -68,6 +68,7 @@ model Product {
   title               String
   description         String?
   sell_price          Float
+  rent_price          Float?  
   stock               Int
   created_at          DateTime               @default(now())
   updated_at          DateTime               @updatedAt
@@ -154,10 +155,8 @@ model Rental {
   id           Int       @id @default(autoincrement())
   customer_id  Int
   invoice      String     @unique
-  start_date   DateTime
-  end_date     DateTime
   dp           Float?     @default(0)
-  rent_price   Float
+  total_rent_price  Float
   status       String      // ongoing, returned, late, cancelled
   created_at   DateTime    @default(now())
   updated_at   DateTime    @updatedAt
@@ -189,17 +188,23 @@ model RentalDetail {
 model Repair {
   id           Int       @id @default(autoincrement())
   customer_id  Int
-  custom_item  String?
+  item_repair  String 
   invoice      String     @unique
   start_date   DateTime
   end_date     DateTime
   description  String
+  component    String?   
+  pic          String   
+  dp           Float?    @default(0)
   repair_cost  Float
   status       String      // process, completed
   created_at   DateTime    @default(now())
   updated_at   DateTime    @updatedAt
   customer     Customer    @relation(fields: [customer_id], references: [id], onDelete: Cascade)
   profits      Profit[]
+  //pic
+  //dp opsional
+  //component opsional
 
   @@map("repairs")
 }

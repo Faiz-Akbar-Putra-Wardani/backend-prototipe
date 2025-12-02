@@ -3,7 +3,7 @@ const express = require('express');
 
 const router = express.Router();
 
-const { validateLogin, validateCustomer, validateCategory, validateProduct, validateDetailProduct, validateCart, validateTransaction, validateRental, validateProject, validateClient } = require('../utils/validators');
+const { validateLogin, validateCustomer, validateCategory, validateProduct, validateDetailProduct, validateCart, validateUpdateCartQty, validateTransaction, validateRental, validateProject, validateClient, validateRepair } = require('../utils/validators');
 const { handleValidationErrors, verifyToken, upload} = require('../middlewares');
 
 const loginController = require('../controllers/LoginController');
@@ -16,6 +16,7 @@ const transactionController = require('../controllers/TransactionController');
 const rentalController = require('../controllers/RentalController');
 const projectController = require('../controllers/ProyekController');
 const clientController = require('../controllers/KlienController');
+const repairController = require('../controllers/RepairController');
 
 const routes = [
   // Login 
@@ -170,7 +171,7 @@ const routes = [
   },
    { method: 'put', 
     path: '/carts/:id', 
-    middlewares: [verifyToken, validateCart, handleValidationErrors], 
+    middlewares: [verifyToken, validateUpdateCartQty, handleValidationErrors], 
     handler: cartController.updateCart 
   },
   { method: 'delete', 
@@ -372,8 +373,55 @@ const routes = [
     handler: clientController.allClients
   },
 
-
-
+  // Create Repair
+  {
+    method: 'post',
+    path: '/repairs',
+    middlewares: [verifyToken, validateRepair, handleValidationErrors],
+    handler: repairController.createRepair
+  },
+  // Get All Repairs (with pagination + search)
+  {
+    method: 'get',
+    path: '/repairs',
+    middlewares: [verifyToken],
+    handler: repairController.getRepairs
+  },
+  // Get New Invoice
+  {
+    method: 'get',
+    path: '/repairs/invoice/new',
+    middlewares: [verifyToken],
+    handler: repairController.getNewRepairInvoice
+  },
+  // Get Repair By Invoice
+  {
+    method: 'get',
+    path: '/repairs/invoice/:invoice',
+    middlewares: [verifyToken],
+    handler: repairController.getRepairByInvoice
+  },
+  // Get Repair By ID
+  {
+    method: 'get',
+    path: '/repairs/:id',
+    middlewares: [verifyToken],
+    handler: repairController.getRepairById
+  },
+  // Update Repair (all data except invoice)
+  {
+    method: 'put',
+    path: '/repairs/:id',
+    middlewares: [verifyToken, validateRepair, handleValidationErrors],
+    handler: repairController.updateRepair
+  },
+  // Delete Repair
+  {
+    method: 'delete',
+    path: '/repairs/:id',
+    middlewares: [verifyToken],
+    handler: repairController.deleteRepair
+  },
 
 ];
 

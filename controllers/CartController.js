@@ -167,57 +167,116 @@ const createCart = async (req, res) => {
     }
 };
 
+// const updateCart = async (req, res) => {
+//     const { id } = req.params;
+//     const { qty } = req.body;
+
+//     try {
+//         const cart = await prisma.cart.findUnique({
+//             where: {
+//                 id: Number(id),
+//                 cashier_id: req.userId
+//             }
+//         });
+
+//         if (qty < 1) {
+//   return res.status(422).json({
+//     meta: {
+//       success: false,
+//       message: "Qty minimal 1"
+//     }
+//   });
+// }
+
+
+//         if (!cart) {
+//             return res.status(404).send({
+//                 meta: {
+//                     success: false,
+//                     message: `Keranjang dengan ID: ${id} tidak ditemukan`
+//                 }
+//             });
+//         }
+
+//         // Ambil harga produk untuk hitung price baru
+//         const product = await prisma.product.findUnique({
+//             where: { id: cart.product_id }
+//         });
+
+//         const updated = await prisma.cart.update({
+//             where: { id: Number(id) },
+//             data: {
+//                 qty: Number(qty),
+//                 price: Number(product.sell_price) * Number(qty),
+//                 updated_at: new Date()
+//             }
+//         });
+
+//         res.status(200).send({
+//             meta: {
+//                 success: true,
+//                 message: "Qty cart berhasil diupdate"
+//             },
+//             data: updated
+//         });
+
+//     } catch (err) {
+//         console.error(err);
+//         res.status(500).send({
+//             meta: { success: false, message: "Gagal update cart" },
+//             errors: err
+//         });
+//     }
+// };
+
 const updateCart = async (req, res) => {
-    const { id } = req.params;
-    const { qty } = req.body;
+  const { id } = req.params;
+  const { qty } = req.body;
 
-    try {
-        const cart = await prisma.cart.findUnique({
-            where: {
-                id: Number(id),
-                cashier_id: req.userId
-            }
-        });
-
-        if (!cart) {
-            return res.status(404).send({
-                meta: {
-                    success: false,
-                    message: `Keranjang dengan ID: ${id} tidak ditemukan`
-                }
-            });
-        }
-
-        // Ambil harga produk untuk hitung price baru
-        const product = await prisma.product.findUnique({
-            where: { id: cart.product_id }
-        });
-
-        const updated = await prisma.cart.update({
-            where: { id: Number(id) },
-            data: {
-                qty: Number(qty),
-                price: Number(product.sell_price) * Number(qty),
-                updated_at: new Date()
-            }
-        });
-
-        res.status(200).send({
-            meta: {
-                success: true,
-                message: "Qty cart berhasil diupdate"
-            },
-            data: updated
-        });
-
-    } catch (err) {
-        console.error(err);
-        res.status(500).send({
-            meta: { success: false, message: "Gagal update cart" },
-            errors: err
-        });
+  try {
+    // Validasi dasar
+    if (!Number.isInteger(Number(qty)) || Number(qty) < 1) {
+      return res.status(400).json({
+        meta: { success: false, message: "Qty tidak valid" }
+      });
     }
+
+    const cart = await prisma.cart.findUnique({
+      where: { id: Number(id) }
+    });
+
+    if (!cart || cart.cashier_id !== req.userId) {
+      return res.status(404).json({
+        meta: { success: false, message: "Cart tidak ditemukan" }
+      });
+    }
+
+    const product = await prisma.product.findUnique({
+      where: { id: cart.product_id }
+    });
+
+    const updated = await prisma.cart.update({
+      where: { id: Number(id) },
+      data: {
+        qty: Number(qty),
+        price: product.sell_price * Number(qty),
+        updated_at: new Date(),
+      }
+    });
+
+    res.status(200).json({
+      meta: { success: true, message: "Qty berhasil diupdate" },
+      data: updated
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      meta: { success: false, message: "Gagal update cart" }
+    });
+  }
 };
+
 
 
 // Fungsi deleteCart

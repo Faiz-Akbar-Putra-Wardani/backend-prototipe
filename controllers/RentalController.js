@@ -7,95 +7,113 @@ const prisma = require("../prisma/client");
 // Import generator invoice
 const { generateUniqueRentalInvoice } = require("../utils/generateUniqueRentalInvoice");
 
-// Create Rental
+const { diffMonths } = require("../utils/date");
+
 const createRental = async (req, res) => {
-    try {
-        const invoice = await generateUniqueRentalInvoice();
+  try {
+    const invoice = await generateUniqueRentalInvoice();
 
-        const customerId = parseInt(req.body.customer_id);
-        const dp = parseFloat(req.body.dp) || 0;
-        const rentPrice = parseFloat(req.body.rent_price);
-        const status = req.body.status ?? "ongoing";
+    const customerId = Number(req.body.customer_id);
+    const dp = Number(req.body.dp || 0);
+    const status = req.body.status ?? "ongoing";
 
-        // VALIDASI TANGGAL
-        if (!req.body.start_date || !req.body.end_date) {
-            return res.status(400).json({
-                meta: { success: false, message: "start_date dan end_date wajib diisi" }
-            });
-        }
+    // ✅ VALIDASI TANGGAL DULU SEBELUM CREATE RENTAL
+    for (const d of req.body.details) {
+      const startDate = new Date(d.start_date);
+      const endDate = new Date(d.end_date);
 
-        const startDate = new Date(req.body.start_date);
-        const endDate = new Date(req.body.end_date);
-
-        // VALIDASI WAJIB
-        if (
-            isNaN(customerId) ||
-            isNaN(rentPrice)
-        ) {
-            return res.status(400).json({
-                meta: { success: false, message: "customer_id, rent_price wajib diisi" }
-            });
-        }
-
-        const details = req.body.details;
-        if (!Array.isArray(details) || details.length === 0) {
-            return res.status(400).json({
-                meta: { success: false, message: "details minimal 1 produk" }
-            });
-        }
-
-        // SIMPAN RENTAL UTAMA
-        const rental = await prisma.rental.create({
-            data: {
-                customer_id: customerId,
-                invoice,
-                start_date: startDate,
-                end_date: endDate,
-                dp,
-                rent_price: rentPrice,
-                status,
-            },
+      // Validasi: end_date harus >= start_date
+      if (endDate < startDate) {
+        return res.status(422).json({
+          message: `Tanggal selesai tidak boleh lebih awal dari tanggal mulai untuk produk ID ${d.product_id}`
         });
+      }
 
-        // SIMPAN RENTAL DETAIL
-        for (const item of details) {
+      const months = diffMonths(startDate, endDate);
 
-            await prisma.rentalDetail.create({
-                data: {
-                    rental_id: rental.id,
-                    product_id: item.product_id,
-                    qty: item.qty || 1,
-                    rent_price: item.rent_price,
-                    start_date: startDate,
-                    end_date: endDate,
-                },
-            });
-
-            const totalRent = item.rent_price * (item.qty || 1);
-
-            await prisma.profit.create({
-                data: {
-                    rental_id: rental.id,
-                    total: totalRent,
-                    source: "rental",
-                },
-            });
-        }
-
-        return res.status(201).json({
-            meta: { success: true, message: "Rental berhasil dibuat" },
-            data: rental
+      if (months <= 0) {
+        return res.status(422).json({
+          message: `Tanggal sewa tidak valid untuk produk ID ${d.product_id}`
         });
-
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({
-            meta: { success: false, message: "Terjadi kesalahan server" },
-            errors: error.message,
-        });
+      }
     }
-};
 
+    // ✅ BARU CREATE RENTAL SETELAH SEMUA VALIDASI LOLOS
+    let totalRent = 0;
+
+    const rental = await prisma.rental.create({
+      data: {
+        customer_id: customerId,
+        invoice,
+        dp,
+        total_rent_price: 0,
+        status,
+      },
+    });
+
+    // Loop untuk insert detail
+    for (const d of req.body.details) {
+      const startDate = new Date(d.start_date);
+      const endDate = new Date(d.end_date);
+      const months = diffMonths(startDate, endDate);
+
+      const qty = Number(d.qty);
+      const pricePerMonth = Number(d.rent_price);
+
+      const itemTotal = pricePerMonth * months * qty;
+      totalRent += itemTotal;
+
+      await prisma.rentalDetail.create({
+        data: {
+          rental_id: rental.id,
+          product_id: d.product_id,
+          qty,
+          rent_price: pricePerMonth,
+          start_date: startDate,
+          end_date: endDate
+        }
+      });
+
+      await prisma.profit.create({
+        data: {
+          rental_id: rental.id,
+          total: itemTotal,
+          source: "rental"
+        }
+      });
+    }
+
+    // Validasi DP
+    if (dp > totalRent) {
+      // ⚠️ Jika DP invalid, hapus rental yang sudah dibuat
+      await prisma.rentalDetail.deleteMany({ where: { rental_id: rental.id } });
+      await prisma.profit.deleteMany({ where: { rental_id: rental.id } });
+      await prisma.rental.delete({ where: { id: rental.id } });
+
+      return res.status(422).json({ 
+        message: "DP tidak boleh melebihi total sewa" 
+      });
+    }
+
+    // Update total final
+    await prisma.rental.update({
+      where: { id: rental.id },
+      data: { total_rent_price: totalRent },
+    });
+
+    return res.status(201).json({
+      message: "Rental berhasil dibuat",
+      data: {
+        invoice,
+        total_rent_price: totalRent,
+      },
+    });
+
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
 
 // GET ALL RENTAL + PAGINATION + SEARCH
 const getRentals = async (req, res) => {
@@ -199,8 +217,6 @@ const getRentalById = async (req, res) => {
         });
     }
 };
-
-
 // GET RENTAL BY INVOICE
 const getRentalByInvoice = async (req, res) => {
     try {

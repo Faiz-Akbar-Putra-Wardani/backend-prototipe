@@ -19,6 +19,7 @@ const findProducts = async (req, res) => {
                 title: true,
                 description: true,
                 sell_price: true,
+                rent_price: true,
                 stock: true,
                 image: true,
                 created_at: true,
@@ -64,6 +65,9 @@ const createProduct = async (req, res) => {
                 title: req.body.title,
                 description: req.body.description || null,
                 sell_price: parseFloat(req.body.sell_price),
+                rent_price: req.body.rent_price
+                ? parseFloat(req.body.rent_price)
+                : null,
                 stock: parseInt(req.body.stock),
                 image: req.file ? req.file.path : null,
                 category_id: parseInt(req.body.category_id),
@@ -94,6 +98,7 @@ const findProductById = async (req, res) => {
                 title: true,
                 description: true,
                 sell_price: true,
+                 rent_price: true,
                 stock: true,
                 image: true,
                 created_at: true,
@@ -130,6 +135,9 @@ const updateProduct = async (req, res) => {
             title: req.body.title,
             description: req.body.description || null,
             sell_price: parseFloat(req.body.sell_price),
+            rent_price: req.body.rent_price
+            ? parseFloat(req.body.rent_price)
+            : null,
             stock: parseInt(req.body.stock),
             category_id: parseInt(req.body.category_id),
         };
@@ -203,6 +211,7 @@ const findProductByCategoryId = async (req, res) => {
                 title: true,
                 description: true,
                 sell_price: true,
+                rent_price: true,
                 stock: true,
                 image: true,
                 created_at: true,
@@ -247,6 +256,7 @@ const allProducts = async (req, res) => {
         title: true,
         description: true,
         sell_price: true,
+        rent_price: true,
         stock: true,
         image: true,
         category: {

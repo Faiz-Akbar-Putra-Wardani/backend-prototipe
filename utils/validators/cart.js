@@ -1,9 +1,29 @@
+const { body } = require("express-validator");
 
-const { body } = require('express-validator');
-
+// untuk POST /carts
 const validateCart = [
-    body('product_id').notEmpty().withMessage('Product is required'),
-    body('qty').notEmpty().withMessage('Qty is required'),
+  body("product_id")
+    .notEmpty()
+    .withMessage("Product is required")
+    .isInt(),
+
+  body("qty")
+    .notEmpty()
+    .withMessage("Qty is required")
+    .isInt({ min: 1 })
+    .withMessage("Qty minimal 1"),
 ];
 
-module.exports = { validateCart }
+// untuk PUT /carts/:id
+const validateUpdateCartQty = [
+  body("qty")
+    .notEmpty()
+    .withMessage("Qty is required")
+    .isInt({ min: 1 })
+    .withMessage("Qty minimal 1"),
+];
+
+module.exports = {
+  validateCart,
+  validateUpdateCartQty,
+};
