@@ -3,7 +3,7 @@ const express = require('express');
 
 const router = express.Router();
 
-const { validateLogin, validateCustomer, validateCategory, validateProduct, validateDetailProduct, validateCart, validateUpdateCartQty, validateTransaction, validateRental, validateProject, validateClient, validateRepair } = require('../utils/validators');
+const { validateLogin, validateCustomer, validateCategory, validateProduct, validateDetailProduct, validateCart, validateUpdateCartQty, validateTransaction, validateRental, validateProject, validateClient, validateRepair, validateBank } = require('../utils/validators');
 const { handleValidationErrors, verifyToken, upload} = require('../middlewares');
 
 const loginController = require('../controllers/LoginController');
@@ -17,6 +17,9 @@ const rentalController = require('../controllers/RentalController');
 const projectController = require('../controllers/ProyekController');
 const clientController = require('../controllers/KlienController');
 const repairController = require('../controllers/RepairController');
+const reportController = require('../controllers/reportController');
+const profitController = require('../controllers/ProfitController');
+const bankController = require('../controllers/BankController');
 
 const routes = [
   // Login 
@@ -187,6 +190,13 @@ const routes = [
     middlewares: [verifyToken, validateTransaction, handleValidationErrors], 
     handler: transactionController.createTransaction 
   },
+    { 
+    method: 'put', 
+    path: '/transactions/:id', 
+    middlewares: [verifyToken, validateTransaction, handleValidationErrors], 
+    handler: transactionController.updateTransaction 
+  },
+
   { 
     method: 'get',
     path: '/transactions',
@@ -220,7 +230,8 @@ const routes = [
   { method: "delete", 
     path: "/transactions/:id", 
     middlewares: [verifyToken], 
-    handler: transactionController.deleteTransaction },
+    handler: transactionController.deleteTransaction 
+  },
 
  {
     method: 'post',
@@ -268,6 +279,14 @@ const routes = [
     middlewares: [verifyToken],
     handler: rentalController.updateRentalStatus
   },
+
+  {
+  method: 'put',
+  path: '/rentals/:id',
+  middlewares: [verifyToken, validateRental, handleValidationErrors],
+  handler: rentalController.updateRental
+},
+
 
   // Delete Rental
   {
@@ -423,8 +442,101 @@ const routes = [
     handler: repairController.deleteRepair
   },
 
-];
+  {
+    method: 'get',
+    path: '/reports/customer-recap',
+    middlewares: [verifyToken],
+    handler: reportController.getCustomerRecap
+  },
+  {
+    method: 'get',
+    path: '/reports/transaction-stats',
+    middlewares: [verifyToken],
+    handler: reportController.getTransactionStats
+  },
 
+  {
+  method: "delete",
+  path: "/reports/:id",
+  middlewares: [verifyToken],
+  handler: reportController.deleteCustomerRecap,
+},
+{
+    method: 'get',
+    path: '/profits/total-revenue',
+    middlewares: [verifyToken],
+    handler: profitController.getTotalRevenue
+  },
+  {
+    method: 'get',
+    path: '/profits/revenue-stats',
+    middlewares: [verifyToken],
+    handler: profitController.getRevenueStats
+  },
+  {
+    method: 'get',
+    path: '/profits/revenue-period',
+    middlewares: [verifyToken],
+    handler: profitController.getRevenueByPeriod
+  },
+  {
+    method: 'get',
+    path: '/profits/monthly-revenue',
+    middlewares: [verifyToken],
+    handler: profitController.getMonthlyRevenue
+  },
+  {
+    method: 'get',
+    path: '/profits/monthly-revenue-by-source',
+    middlewares: [verifyToken],
+    handler: profitController.getMonthlyRevenueBySource
+  },
+    {
+    method: 'get',
+    path: '/profits/recent-transactions',
+    middlewares: [verifyToken],
+    handler: profitController.getRecentTransactions
+  },
+
+   // Bank Routes
+  {
+    method: 'get',
+    path: '/banks',
+    middlewares: [verifyToken],
+    handler: bankController.findBanks
+  },
+  {
+    method: 'post',
+    path: '/banks',
+    middlewares: [verifyToken, validateBank, handleValidationErrors],
+    handler: bankController.createBank
+  },
+  {
+    method: 'get',
+    path: '/banks/:id',
+    middlewares: [verifyToken],
+    handler: bankController.findBankById
+  },
+  {
+    method: 'put',
+    path: '/banks/:id',
+    middlewares: [verifyToken, validateBank, handleValidationErrors],
+    handler: bankController.updateBank
+  },
+  {
+    method: 'delete',
+    path: '/banks/:id',
+    middlewares: [verifyToken],
+    handler: bankController.deleteBank
+  },
+  {
+    method: 'get',
+    path: '/banks-all',
+    middlewares: [verifyToken],
+    handler: bankController.allBanks
+  },
+
+];
 
 const createRoutes = (routes) => {
   routes.forEach(({ method, path, middlewares, handler }) => {

@@ -102,7 +102,7 @@ const createRepair = async (req, res) => {
       data: {
         repair_id: repair.id,
         total: repairCost,
-        source: "repair",
+        source: "perbaikan",
       },
     });
 

@@ -245,3 +245,14 @@ model Partnership {
 
   @@map("partnerships")
 }
+
+model Bank {
+  id              Int      @id @default(autoincrement())
+  account_holder  String   // Nama pemilik (Atas Nama)
+  bank_name       String   // Nama Bank (contoh: Bank BRI, Bank MANDIRI)
+  account_number  String   @unique // Nomor Rekening
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@map("banks")
+}

@@ -9,6 +9,21 @@ const { validateRental } = require("./rental");
 const { validateProject } = require("./proyek");
 const { validateClient } = require("./klien");
 const { validateRepair } = require("./repair");
+const { validateBank } = require("./bank");
 
 
-module.exports = { validateLogin, validateCustomer, validateCategory, validateProduct, validateDetailProduct, validateCart, validateUpdateCartQty, validateTransaction, validateRental,validateProject, validateClient, validateRepair };
+module.exports = { 
+    validateLogin, 
+    validateCustomer, 
+    validateCategory, 
+    validateProduct, 
+    validateDetailProduct, 
+    validateCart, 
+    validateUpdateCartQty, 
+    validateTransaction, 
+    validateRental,
+    validateProject, 
+    validateClient, 
+    validateRepair,
+    validateBank
+ };

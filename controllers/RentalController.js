@@ -17,7 +17,6 @@ const createRental = async (req, res) => {
     const dp = Number(req.body.dp || 0);
     const status = req.body.status ?? "ongoing";
 
-    // ✅ VALIDASI TANGGAL DULU SEBELUM CREATE RENTAL
     for (const d of req.body.details) {
       const startDate = new Date(d.start_date);
       const endDate = new Date(d.end_date);
@@ -38,7 +37,6 @@ const createRental = async (req, res) => {
       }
     }
 
-    // ✅ BARU CREATE RENTAL SETELAH SEMUA VALIDASI LOLOS
     let totalRent = 0;
 
     const rental = await prisma.rental.create({
@@ -52,40 +50,41 @@ const createRental = async (req, res) => {
     });
 
     // Loop untuk insert detail
-    for (const d of req.body.details) {
-      const startDate = new Date(d.start_date);
-      const endDate = new Date(d.end_date);
-      const months = diffMonths(startDate, endDate);
+   // Loop untuk insert detail + create profit
+for (const d of req.body.details) {
+  const startDate = new Date(d.start_date);
+  const endDate = new Date(d.end_date);
+  const months = diffMonths(startDate, endDate);
 
-      const qty = Number(d.qty);
-      const pricePerMonth = Number(d.rent_price);
+  const qty = Number(d.qty);
+  const pricePerMonth = Number(d.rent_price);
 
-      const itemTotal = pricePerMonth * months * qty;
-      totalRent += itemTotal;
+  const itemTotal = pricePerMonth * months * qty;
+  totalRent += itemTotal;
 
-      await prisma.rentalDetail.create({
-        data: {
-          rental_id: rental.id,
-          product_id: d.product_id,
-          qty,
-          rent_price: pricePerMonth,
-          start_date: startDate,
-          end_date: endDate
-        }
-      });
-
-      await prisma.profit.create({
-        data: {
-          rental_id: rental.id,
-          total: itemTotal,
-          source: "rental"
-        }
-      });
+  await prisma.rentalDetail.create({
+    data: {
+      rental_id: rental.id,
+      product_id: d.product_id,
+      qty,
+      rent_price: pricePerMonth,
+      start_date: startDate,
+      end_date: endDate
     }
+  });
+
+  await prisma.profit.create({
+    data: {
+      rental_id: rental.id,
+      total: itemTotal,
+      source: "sewa"
+    }
+  });
+}
+
 
     // Validasi DP
     if (dp > totalRent) {
-      // ⚠️ Jika DP invalid, hapus rental yang sudah dibuat
       await prisma.rentalDetail.deleteMany({ where: { rental_id: rental.id } });
       await prisma.profit.deleteMany({ where: { rental_id: rental.id } });
       await prisma.rental.delete({ where: { id: rental.id } });
@@ -114,6 +113,137 @@ const createRental = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
+
+const updateRental = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+
+    // Validasi ID
+    if (isNaN(id)) {
+      return res.status(400).json({
+        meta: {
+          success: false,
+          message: "ID rental tidak valid",
+        },
+      });
+    }
+
+    // Cek apakah rental ada
+    const existingRental = await prisma.rental.findUnique({
+      where: { id },
+    });
+
+    if (!existingRental) {
+      return res.status(404).json({
+        meta: {
+          success: false,
+          message: "Rental tidak ditemukan",
+        },
+      });
+    }
+
+    const customerId = Number(req.body.customer_id);
+    const dp = Number(req.body.dp || 0);
+    const status = req.body.status ?? "ongoing";
+
+    // Validasi tanggal untuk setiap detail
+    for (const d of req.body.details) {
+      const startDate = new Date(d.start_date);
+      const endDate = new Date(d.end_date);
+
+      if (endDate < startDate) {
+        return res.status(422).json({
+          message: `Tanggal selesai tidak boleh lebih awal dari tanggal mulai untuk produk ID ${d.product_id}`
+        });
+      }
+
+      const months = diffMonths(startDate, endDate);
+
+      if (months <= 0) {
+        return res.status(422).json({
+          message: `Tanggal sewa tidak valid untuk produk ID ${d.product_id}`
+        });
+      }
+    }
+
+    let totalRent = 0;
+
+    // Hapus detail & profit lama
+    await prisma.rentalDetail.deleteMany({ where: { rental_id: id } });
+    await prisma.profit.deleteMany({ where: { rental_id: id } });
+
+    // Insert detail baru
+    for (const d of req.body.details) {
+      const startDate = new Date(d.start_date);
+      const endDate = new Date(d.end_date);
+      const months = diffMonths(startDate, endDate);
+
+      const qty = Number(d.qty);
+      const pricePerMonth = Number(d.rent_price);
+
+      const itemTotal = pricePerMonth * months * qty;
+      totalRent += itemTotal;
+
+      await prisma.rentalDetail.create({
+        data: {
+          rental_id: id,
+          product_id: d.product_id,
+          qty,
+          rent_price: pricePerMonth,
+          start_date: startDate,
+          end_date: endDate
+        }
+      });
+
+      await prisma.profit.create({
+        data: {
+          rental_id: id,
+          total: itemTotal,
+          source: "sewa"
+        }
+      });
+    }
+
+    // Validasi DP
+    if (dp > totalRent) {
+      return res.status(422).json({ 
+        message: "DP tidak boleh melebihi total sewa" 
+      });
+    }
+
+    // Update rental header (invoice tetap tidak berubah)
+    const updatedRental = await prisma.rental.update({
+      where: { id },
+      data: { 
+        customer_id: customerId,
+        dp,
+        total_rent_price: totalRent,
+        status
+      },
+    });
+
+    return res.status(200).json({
+      meta: {
+        success: true,
+        message: "Rental berhasil diperbarui"
+      },
+      data: {
+        invoice: updatedRental.invoice,
+        total_rent_price: totalRent,
+      },
+    });
+
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ 
+      meta: { success: false, message: "Server error" },
+      errors: e.message 
+    });
+  }
+};
+
+
+
 
 // GET ALL RENTAL + PAGINATION + SEARCH
 const getRentals = async (req, res) => {
@@ -348,5 +478,6 @@ module.exports = {
     getRentalByInvoice,
     getNewInvoice,
     updateRentalStatus,
+    updateRental,
     deleteRental,
 };

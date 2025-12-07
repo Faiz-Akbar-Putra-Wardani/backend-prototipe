@@ -148,14 +148,7 @@ const createTransaction = async (req, res) => {
             // Hitung total jual (untuk profit)
             const totalSellPrice = cart.product.sell_price * cart.qty;
 
-            // Simpan profit (INI YANG ERROR KEMARIN)
-            await prisma.profit.create({
-            data: {
-                transaction_id: transaction.id,
-                total: totalSellPrice,
-                source: "sale",
-            },
-            });
+            
 
             // Update stok
             // await prisma.product.update({
@@ -163,6 +156,14 @@ const createTransaction = async (req, res) => {
             //     data: { stock: { decrement: cart.qty } },
             // });
         }
+        // Simpan profit (INI YANG ERROR KEMARIN)
+            await prisma.profit.create({
+            data: {
+                transaction_id: transaction.id,
+                total: grandTotal,
+                source: "penjualan",
+            },
+            });
 
         // 4. Bersihkan cart kasir
         await prisma.cart.deleteMany({
@@ -189,6 +190,155 @@ const createTransaction = async (req, res) => {
         });
     }
 };
+
+const updateTransaction = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+
+    // Validasi ID
+    if (isNaN(id)) {
+      return res.status(400).json({
+        meta: {
+          success: false,
+          message: "ID transaksi tidak valid",
+        },
+      });
+    }
+
+    // Cek apakah transaksi ada
+    const existingTransaction = await prisma.transaction.findUnique({
+      where: { id },
+    });
+
+    if (!existingTransaction) {
+      return res.status(404).json({
+        meta: {
+          success: false,
+          message: "Transaksi tidak ditemukan",
+        },
+      });
+    }
+
+    // Input dari frontend (invoice tidak bisa diubah)
+    const customerId = req.body.customer_id ? parseInt(req.body.customer_id) : null;
+    const subtotal = parseFloat(req.body.subtotal) || 0;
+    const subtotalPlusExtra = parseFloat(req.body.subtotalPlusExtra) || 0;
+    const extra = parseFloat(req.body.extra) || 0;
+    const dp = parseFloat(req.body.dp) || 0;
+    const nego = parseFloat(req.body.nego) || 0;
+    const pph = parseFloat(req.body.pph) || 0;
+    const pphNominal = parseFloat(req.body.pph_nominal) || 0;
+    const grandTotal = parseFloat(req.body.grand_total);
+    const status = req.body.status;
+
+    // Validasi wajib
+    if (isNaN(grandTotal)) {
+      return res.status(400).json({
+        meta: {
+          success: false,
+          message: "Input tidak valid. Periksa kembali data transaksi.",
+        },
+      });
+    }
+
+    // VALIDASI PPH
+    const maxPphNominal = subtotalPlusExtra;
+
+    if (pphNominal > maxPphNominal) {
+      return res.status(422).json({
+        meta: {
+          success: false,
+          message: "PPH tidak boleh melebihi total biaya",
+        },
+      });
+    }
+
+    if (pph < 0 || pph > 100) {
+      return res.status(422).json({
+        meta: {
+          success: false,
+          message: "PPH harus berada di antara 0 - 100%",
+        },
+      });
+    }
+
+    // VALIDASI DP
+    if (dp > grandTotal) {
+      return res.status(422).json({
+        meta: {
+          success: false,
+          message: "DP tidak boleh melebihi total bayar",
+        },
+      });
+    }
+
+    if (dp < 0) {
+      return res.status(422).json({
+        meta: {
+          success: false,
+          message: "DP tidak boleh kurang dari 0",
+        },
+      });
+    }
+
+    // VALIDASI NEGO
+    const maxNego = subtotalPlusExtra - pphNominal;
+
+    if (nego > maxNego) {
+      return res.status(422).json({
+        meta: {
+          success: false,
+          message: "Harga nego tidak boleh melebihi total sebelum nego",
+        },
+      });
+    }
+
+    if (nego < 0) {
+      return res.status(422).json({
+        meta: {
+          success: false,
+          message: "Harga nego tidak boleh kurang dari 0",
+        },
+      });
+    }
+
+    // Update transaksi (invoice tetap tidak berubah)
+    const updatedTransaction = await prisma.transaction.update({
+      where: { id },
+      data: {
+        customer_id: customerId,
+        subtotal,
+        subtotalPlusExtra,
+        extra,
+        dp,
+        nego,
+        pph,
+        pph_nominal: pphNominal,
+        grand_total: grandTotal,
+        status,
+      },
+    });
+
+    res.status(200).json({
+      meta: {
+        success: true,
+        message: "Transaksi berhasil diperbarui",
+      },
+      data: updatedTransaction,
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      meta: {
+        success: false,
+        message: "Terjadi kesalahan pada server",
+      },
+      errors: error.message,
+    });
+  }
+};
+
 
 
 const getTransactions = async (req, res) => {
@@ -464,5 +614,6 @@ module.exports = {
     getTransactionByInvoice,
     getNewInvoice,
     updateStatus,
+    updateTransaction,
     deleteTransaction
 };
