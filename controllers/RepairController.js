@@ -4,6 +4,9 @@ const express = require("express");
 // Import prisma client untuk berinteraksi dengan database
 const prisma = require("../prisma/client");
 
+// Import fs untuk mengelola file
+const fs = require("fs");
+
 // Import function untuk menghasilkan invoice unik repair
 const { generateUniqueRepairInvoice } = require('../utils/generateUniqueRepair');
 
@@ -24,7 +27,6 @@ const createRepair = async (req, res) => {
     const dp = parseFloat(req.body.dp) || 0;
     const repairCost = parseFloat(req.body.repair_cost);
     const status = req.body.status;
-
 
     // VALIDASI CUSTOMER EXISTS
     const customerExists = await prisma.customer.findUnique({
@@ -70,12 +72,12 @@ const createRepair = async (req, res) => {
     }
 
     // VALIDASI STATUS
-    const validStatuses = ['process', 'completed', 'pending'];
+    const validStatuses = ['masuk', 'proses', 'selesai'];
     if (!validStatuses.includes(status)) {
       return res.status(422).json({
         meta: {
           success: false,
-          message: "Status harus: process, completed, atau pending",
+          message: "Status harus: masuk, proses, atau selesai",
         },
       });
     }
@@ -90,6 +92,7 @@ const createRepair = async (req, res) => {
         end_date: endDate,
         description,
         component,
+        image: req.file ? req.file.path : null,  // Tambahkan image
         pic,
         dp,
         repair_cost: repairCost,
@@ -294,6 +297,7 @@ const getNewRepairInvoice = async (req, res) => {
     });
   }
 };
+
 const updateRepair = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -368,31 +372,44 @@ const updateRepair = async (req, res) => {
     }
 
     // VALIDASI STATUS
-    const validStatuses = ['process', 'completed', 'pending'];
+    const validStatuses = ['masuk', 'proses', 'selesai'];
     if (!validStatuses.includes(status)) {
       return res.status(422).json({
         meta: {
           success: false,
-          message: "Status harus: process, completed, atau pending",
+          message: "Status harus: 'masuk', 'proses', atau 'selesai'",
         },
       });
+    }
+
+    // Prepare data update
+    const dataRepair = {
+      customer_id: customerId,
+      item_repair: itemRepair,
+      start_date: startDate,
+      end_date: endDate,
+      description,
+      component,
+      pic,
+      dp,
+      repair_cost: repairCost,
+      status,
+    };
+
+    // Handle image upload jika ada file baru
+    if (req.file) {
+      dataRepair.image = req.file.path;
+
+      // Hapus gambar lama jika ada
+      if (existingRepair.image && fs.existsSync(existingRepair.image)) {
+        fs.unlinkSync(existingRepair.image);
+      }
     }
 
     // Update data perbaikan (KECUALI INVOICE)
     const updatedRepair = await prisma.repair.update({
       where: { id },
-      data: {
-        customer_id: customerId,
-        item_repair: itemRepair,
-        start_date: startDate,
-        end_date: endDate,
-        description,
-        component,
-        pic,
-        dp,
-        repair_cost: repairCost,
-        status,
-      },
+      data: dataRepair,
     });
 
     // Update profit jika repair_cost berubah
@@ -432,6 +449,17 @@ const deleteRepair = async (req, res) => {
       });
     }
 
+    // Ambil data repair untuk cek image
+    const repair = await prisma.repair.findUnique({
+      where: { id },
+    });
+
+    if (!repair) {
+      return res.status(404).json({
+        meta: { success: false, message: "Data perbaikan tidak ditemukan" },
+      });
+    }
+
     // Hapus profit terkait
     await prisma.profit.deleteMany({
       where: { repair_id: id },
@@ -441,6 +469,11 @@ const deleteRepair = async (req, res) => {
     await prisma.repair.delete({
       where: { id },
     });
+
+    // Hapus file image jika ada
+    if (repair.image && fs.existsSync(repair.image)) {
+      fs.unlinkSync(repair.image);
+    }
 
     res.status(200).json({
       meta: {

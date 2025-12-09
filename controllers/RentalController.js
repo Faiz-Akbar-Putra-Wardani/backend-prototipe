@@ -15,7 +15,18 @@ const createRental = async (req, res) => {
 
     const customerId = Number(req.body.customer_id);
     const dp = Number(req.body.dp || 0);
-    const status = req.body.status ?? "ongoing";
+    const status = req.body.status ?? "berlangsung";
+
+    // VALIDASI STATUS
+    const validStatuses = ['berlangsung', 'selesai'];
+    if (!validStatuses.includes(status)) {
+      return res.status(422).json({
+        meta: {
+          success: false,
+          message: "Status harus: berlangsung atau selesai",
+        },
+      });
+    }
 
     for (const d of req.body.details) {
       const startDate = new Date(d.start_date);
@@ -24,7 +35,10 @@ const createRental = async (req, res) => {
       // Validasi: end_date harus >= start_date
       if (endDate < startDate) {
         return res.status(422).json({
-          message: `Tanggal selesai tidak boleh lebih awal dari tanggal mulai untuk produk ID ${d.product_id}`
+          meta: {
+            success: false,
+            message: `Tanggal selesai tidak boleh lebih awal dari tanggal mulai untuk produk ID ${d.product_id}`
+          }
         });
       }
 
@@ -32,7 +46,10 @@ const createRental = async (req, res) => {
 
       if (months <= 0) {
         return res.status(422).json({
-          message: `Tanggal sewa tidak valid untuk produk ID ${d.product_id}`
+          meta: {
+            success: false,
+            message: `Tanggal sewa tidak valid untuk produk ID ${d.product_id}`
+          }
         });
       }
     }
@@ -49,39 +66,37 @@ const createRental = async (req, res) => {
       },
     });
 
-    // Loop untuk insert detail
-   // Loop untuk insert detail + create profit
-for (const d of req.body.details) {
-  const startDate = new Date(d.start_date);
-  const endDate = new Date(d.end_date);
-  const months = diffMonths(startDate, endDate);
+    // Loop untuk insert detail + create profit
+    for (const d of req.body.details) {
+      const startDate = new Date(d.start_date);
+      const endDate = new Date(d.end_date);
+      const months = diffMonths(startDate, endDate);
 
-  const qty = Number(d.qty);
-  const pricePerMonth = Number(d.rent_price);
+      const qty = Number(d.qty);
+      const pricePerMonth = Number(d.rent_price);
 
-  const itemTotal = pricePerMonth * months * qty;
-  totalRent += itemTotal;
+      const itemTotal = pricePerMonth * months * qty;
+      totalRent += itemTotal;
 
-  await prisma.rentalDetail.create({
-    data: {
-      rental_id: rental.id,
-      product_id: d.product_id,
-      qty,
-      rent_price: pricePerMonth,
-      start_date: startDate,
-      end_date: endDate
+      await prisma.rentalDetail.create({
+        data: {
+          rental_id: rental.id,
+          product_id: d.product_id,
+          qty,
+          rent_price: pricePerMonth,
+          start_date: startDate,
+          end_date: endDate
+        }
+      });
+
+      await prisma.profit.create({
+        data: {
+          rental_id: rental.id,
+          total: itemTotal,
+          source: "sewa"
+        }
+      });
     }
-  });
-
-  await prisma.profit.create({
-    data: {
-      rental_id: rental.id,
-      total: itemTotal,
-      source: "sewa"
-    }
-  });
-}
-
 
     // Validasi DP
     if (dp > totalRent) {
@@ -90,7 +105,23 @@ for (const d of req.body.details) {
       await prisma.rental.delete({ where: { id: rental.id } });
 
       return res.status(422).json({ 
-        message: "DP tidak boleh melebihi total sewa" 
+        meta: {
+          success: false,
+          message: "DP tidak boleh melebihi total sewa"
+        }
+      });
+    }
+
+    if (dp < 0) {
+      await prisma.rentalDetail.deleteMany({ where: { rental_id: rental.id } });
+      await prisma.profit.deleteMany({ where: { rental_id: rental.id } });
+      await prisma.rental.delete({ where: { id: rental.id } });
+
+      return res.status(422).json({
+        meta: {
+          success: false,
+          message: "DP tidak boleh kurang dari 0",
+        },
       });
     }
 
@@ -101,7 +132,10 @@ for (const d of req.body.details) {
     });
 
     return res.status(201).json({
-      message: "Rental berhasil dibuat",
+      meta: {
+        success: true,
+        message: "Rental berhasil dibuat"
+      },
       data: {
         invoice,
         total_rent_price: totalRent,
@@ -110,7 +144,13 @@ for (const d of req.body.details) {
 
   } catch (e) {
     console.error(e);
-    return res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ 
+      meta: {
+        success: false,
+        message: "Server error"
+      },
+      errors: e.message
+    });
   }
 };
 
@@ -144,7 +184,18 @@ const updateRental = async (req, res) => {
 
     const customerId = Number(req.body.customer_id);
     const dp = Number(req.body.dp || 0);
-    const status = req.body.status ?? "ongoing";
+    const status = req.body.status ?? "berlangsung";
+
+    // VALIDASI STATUS
+    const validStatuses = ['berlangsung', 'selesai'];
+    if (!validStatuses.includes(status)) {
+      return res.status(422).json({
+        meta: {
+          success: false,
+          message: "Status harus: berlangsung atau selesai",
+        },
+      });
+    }
 
     // Validasi tanggal untuk setiap detail
     for (const d of req.body.details) {
@@ -153,7 +204,10 @@ const updateRental = async (req, res) => {
 
       if (endDate < startDate) {
         return res.status(422).json({
-          message: `Tanggal selesai tidak boleh lebih awal dari tanggal mulai untuk produk ID ${d.product_id}`
+          meta: {
+            success: false,
+            message: `Tanggal selesai tidak boleh lebih awal dari tanggal mulai untuk produk ID ${d.product_id}`
+          }
         });
       }
 
@@ -161,7 +215,10 @@ const updateRental = async (req, res) => {
 
       if (months <= 0) {
         return res.status(422).json({
-          message: `Tanggal sewa tidak valid untuk produk ID ${d.product_id}`
+          meta: {
+            success: false,
+            message: `Tanggal sewa tidak valid untuk produk ID ${d.product_id}`
+          }
         });
       }
     }
@@ -207,7 +264,19 @@ const updateRental = async (req, res) => {
     // Validasi DP
     if (dp > totalRent) {
       return res.status(422).json({ 
-        message: "DP tidak boleh melebihi total sewa" 
+        meta: {
+          success: false,
+          message: "DP tidak boleh melebihi total sewa"
+        }
+      });
+    }
+
+    if (dp < 0) {
+      return res.status(422).json({
+        meta: {
+          success: false,
+          message: "DP tidak boleh kurang dari 0",
+        },
       });
     }
 
@@ -241,9 +310,6 @@ const updateRental = async (req, res) => {
     });
   }
 };
-
-
-
 
 // GET ALL RENTAL + PAGINATION + SEARCH
 const getRentals = async (req, res) => {
@@ -303,7 +369,6 @@ const getRentals = async (req, res) => {
     }
 };
 
-
 // GET RENTAL BY ID
 const getRentalById = async (req, res) => {
     try {
@@ -347,6 +412,7 @@ const getRentalById = async (req, res) => {
         });
     }
 };
+
 // GET RENTAL BY INVOICE
 const getRentalByInvoice = async (req, res) => {
     try {
@@ -395,7 +461,6 @@ const getNewInvoice = async (req, res) => {
   }
 };
 
-
 // UPDATE RENTAL STATUS
 const updateRentalStatus = async (req, res) => {
   try {
@@ -404,6 +469,17 @@ const updateRentalStatus = async (req, res) => {
     if (!invoice || !status) {
       return res.status(400).json({
         meta: { success: false, message: "Invoice dan status wajib diisi" },
+      });
+    }
+
+    // VALIDASI STATUS
+    const validStatuses = ['berlangsung', 'selesai'];
+    if (!validStatuses.includes(status)) {
+      return res.status(422).json({
+        meta: {
+          success: false,
+          message: "Status harus: berlangsung atau selesai",
+        },
       });
     }
 
@@ -444,12 +520,27 @@ const updateRentalStatus = async (req, res) => {
   }
 };
 
-
-
 // DELETE RENTAL
 const deleteRental = async (req, res) => {
     try {
         const id = parseInt(req.params.id);
+
+        if (isNaN(id)) {
+          return res.status(400).json({
+            meta: { success: false, message: "ID tidak valid" },
+          });
+        }
+
+        // Cek apakah rental exists
+        const rental = await prisma.rental.findUnique({
+          where: { id },
+        });
+
+        if (!rental) {
+          return res.status(404).json({
+            meta: { success: false, message: "Rental tidak ditemukan" },
+          });
+        }
 
         // Hapus detail & profit dulu
         await prisma.rentalDetail.deleteMany({ where: { rental_id: id } });
@@ -462,13 +553,13 @@ const deleteRental = async (req, res) => {
         });
 
     } catch (error) {
+        console.error(error);
         res.status(500).json({
             meta: { success: false, message: "Gagal menghapus rental" },
             errors: error.message,
         });
     }
 };
-
 
 // EXPORT
 module.exports = {

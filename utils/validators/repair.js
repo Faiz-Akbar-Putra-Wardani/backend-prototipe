@@ -1,4 +1,4 @@
-const { body } = require('express-validator');
+const { body, check } = require('express-validator');
 
 const validateRepair = [
   // Customer ID - wajib
@@ -36,6 +36,7 @@ const validateRepair = [
     .notEmpty().withMessage("Deskripsi perbaikan wajib diisi")
     .isString().withMessage("Deskripsi harus berupa teks")
     .trim(),
+    
   // Component - opsional
   body("component")
     .optional({ checkFalsy: true })
@@ -69,7 +70,16 @@ const validateRepair = [
   // Status - wajib
   body("status")
     .notEmpty().withMessage("Status wajib dipilih")
-    .isIn(['process', 'completed', 'pending']).withMessage("Status harus: process, completed, atau pending"),
+    .isIn(['masuk', 'proses', 'selesai']).withMessage("Status harus: masuk, proses atau selesai"),
+    
+  // Image validation untuk multer
+  check("image").custom((value, { req }) => {
+  if (req.method === 'POST' && !req.file) {
+    throw new Error("Gambar wajib diisi");
+  }
+  return true;
+}),
+
 ];
 
 module.exports = { validateRepair };

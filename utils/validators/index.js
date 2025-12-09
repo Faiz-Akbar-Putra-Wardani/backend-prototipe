@@ -10,6 +10,7 @@ const { validateProject } = require("./proyek");
 const { validateClient } = require("./klien");
 const { validateRepair } = require("./repair");
 const { validateBank } = require("./bank");
+const { validateCreateAdmin, validateUpdateAdmin } = require("./admin");
 
 
 module.exports = { 
@@ -25,5 +26,7 @@ module.exports = {
     validateProject, 
     validateClient, 
     validateRepair,
-    validateBank
+    validateBank,
+    validateCreateAdmin,
+    validateUpdateAdmin,
  };

@@ -8,7 +8,8 @@ async function main(){
         data: {
             name: "sinar elektro sejahtera",
             email: "ses@gmail.com",
-            password
+            password,
+            role: "super_admin"
         }
     });
 }

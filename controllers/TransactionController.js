@@ -10,7 +10,6 @@ const { generateUniqueInvoice } = require('../utils/generateUniqueInvoice');
 // Fungsi untuk membuat transaksi
 const createTransaction = async (req, res) => {
     try {
-
         // Generate invoice
         const invoice = await generateUniqueInvoice();
 
@@ -37,6 +36,17 @@ const createTransaction = async (req, res) => {
             });
         }
 
+        // VALIDASI STATUS
+        const validStatuses = ['proses', 'dikirim', 'selesai'];
+        if (!validStatuses.includes(status)) {
+            return res.status(422).json({
+                meta: {
+                    success: false,
+                    message: "Status harus: proses, dikirim, atau selesai",
+                },
+            });
+        }
+
         // VALIDASI PPH
         const maxPphNominal = subtotalPlusExtra;
 
@@ -58,7 +68,6 @@ const createTransaction = async (req, res) => {
           });
         }
 
-
         // VALIDASI DP
         if (dp > grandTotal) {
           return res.status(422).json({
@@ -79,25 +88,26 @@ const createTransaction = async (req, res) => {
         }
 
         //  VALIDASI NEGO
-          const maxNego = subtotalPlusExtra - pphNominal
+        const maxNego = subtotalPlusExtra - pphNominal
 
-          if (nego > maxNego) {
+        if (nego > maxNego) {
             return res.status(422).json({
               meta: {
                 success: false,
                 message: "Harga nego tidak boleh melebihi total sebelum nego",
               },
             })
-          }
+        }
 
-          if (nego < 0) {
+        if (nego < 0) {
             return res.status(422).json({
               meta: {
                 success: false,
                 message: "Harga nego tidak boleh kurang dari 0",
               },
             })
-          }
+        }
+
         // 1. Simpan transaksi utama
         const transaction = await prisma.transaction.create({
             data: {
@@ -134,7 +144,6 @@ const createTransaction = async (req, res) => {
 
         // 3. Loop item cart → simpan detail + profit + update stok
         for (const cart of carts) {
-
             // Simpan detail transaksi
             await prisma.transactionDetail.create({
                 data: {
@@ -148,22 +157,21 @@ const createTransaction = async (req, res) => {
             // Hitung total jual (untuk profit)
             const totalSellPrice = cart.product.sell_price * cart.qty;
 
-            
-
             // Update stok
             // await prisma.product.update({
             //     where: { id: cart.product_id },
             //     data: { stock: { decrement: cart.qty } },
             // });
         }
-        // Simpan profit (INI YANG ERROR KEMARIN)
-            await prisma.profit.create({
+
+        // Simpan profit
+        await prisma.profit.create({
             data: {
                 transaction_id: transaction.id,
                 total: grandTotal,
                 source: "penjualan",
             },
-            });
+        });
 
         // 4. Bersihkan cart kasir
         await prisma.cart.deleteMany({
@@ -239,6 +247,17 @@ const updateTransaction = async (req, res) => {
           message: "Input tidak valid. Periksa kembali data transaksi.",
         },
       });
+    }
+
+    // VALIDASI STATUS
+    const validStatuses = ['proses', 'dikirim', 'selesai'];
+    if (!validStatuses.includes(status)) {
+        return res.status(422).json({
+            meta: {
+                success: false,
+                message: "Status harus: proses, dikirim, atau selesai",
+            },
+        });
     }
 
     // VALIDASI PPH
@@ -339,8 +358,6 @@ const updateTransaction = async (req, res) => {
   }
 };
 
-
-
 const getTransactions = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -403,7 +420,6 @@ const getTransactions = async (req, res) => {
   }
 };
 
-
 const getTransactionById = async (req, res) => {
     try {
         const id = parseInt(req.params.id);
@@ -458,6 +474,7 @@ const getTransactionById = async (req, res) => {
         });
     }
 };
+
 const getTransactionByInvoice = async (req, res) => {
   try {
     const invoice = req.params.invoice;
@@ -528,6 +545,17 @@ const updateStatus = async (req, res) => {
       });
     }
 
+    // VALIDASI STATUS
+    const validStatuses = ['proses', 'dikirim', 'selesai'];
+    if (!validStatuses.includes(status)) {
+        return res.status(422).json({
+            meta: {
+                success: false,
+                message: "Status harus: proses, dikirim, atau selesai",
+            },
+        });
+    }
+
     // Cek apakah transaksi ada
     const exist = await prisma.transaction.findUnique({
       where: { invoice },
@@ -565,7 +593,6 @@ const updateStatus = async (req, res) => {
   }
 };
 
-
 const deleteTransaction = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -573,6 +600,17 @@ const deleteTransaction = async (req, res) => {
     if (isNaN(id)) {
       return res.status(400).json({
         meta: { success: false, message: "ID tidak valid" },
+      });
+    }
+
+    // Cek apakah transaksi exists
+    const transaction = await prisma.transaction.findUnique({
+      where: { id },
+    });
+
+    if (!transaction) {
+      return res.status(404).json({
+        meta: { success: false, message: "Transaksi tidak ditemukan" },
       });
     }
 

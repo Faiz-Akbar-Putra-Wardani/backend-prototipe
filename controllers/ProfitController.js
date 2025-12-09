@@ -291,8 +291,6 @@ const getMonthlyRevenueBySource = async (req, res) => {
 
 // profitController.js
 
-// Get recent transactions untuk dashboard
-//  GET RECENT TRANSACTIONS - FIXED VERSION
 const getRecentTransactions = async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 5;
@@ -318,6 +316,7 @@ const getRecentTransactions = async (req, res) => {
         transaction: {
           select: {
             invoice: true,
+            status: true,
             customer: {
               select: {
                 name_perusahaan: true, 
@@ -359,7 +358,9 @@ const getRecentTransactions = async (req, res) => {
         repair: {
           select: {
             invoice: true,
-            item_repair: true, 
+            status: true,
+            item_repair: true,
+            image: true,  // ✅ TAMBAHKAN IMAGE UNTUK PERBAIKAN
             customer: {
               select: {
                 name_perusahaan: true,
@@ -382,14 +383,15 @@ const getRecentTransactions = async (req, res) => {
         source: profit.source,
         total: profit.total,
         date: profit.created_at,
-        status: 'completed'
+        status: 'unknown'
       };
 
       try {
-        //  PENJUALAN
+        // ✅ PENJUALAN (proses, dikirim, selesai)
         if (profit.source === 'penjualan' && profit.transaction) {
           transactionData.invoice = profit.transaction.invoice || 'N/A';
           transactionData.customer = profit.transaction.customer?.name_perusahaan || 'Guest';
+          transactionData.status = profit.transaction.status || 'proses';
           
           transactionData.items = (profit.transaction.transaction_details || []).map(d => ({
             name: d.product?.title || 'Unknown Product',
@@ -398,11 +400,11 @@ const getRecentTransactions = async (req, res) => {
           }));
         } 
         
-        // SEWA
+        // ✅ SEWA (berlangsung, selesai)
         else if (profit.source === 'sewa' && profit.rental) {
           transactionData.invoice = profit.rental.invoice || 'N/A';
           transactionData.customer = profit.rental.customer?.name_perusahaan || 'Unknown';
-          transactionData.status = profit.rental.status || 'ongoing';
+          transactionData.status = profit.rental.status || 'berlangsung';
           
           transactionData.items = (profit.rental.details || []).map(d => ({
             name: d.product?.title || 'Unknown Product',
@@ -411,14 +413,15 @@ const getRecentTransactions = async (req, res) => {
           }));
         } 
         
-        // ✅ PERBAIKAN
+        // ✅ PERBAIKAN (masuk, proses, selesai) - WITH IMAGE
         else if (profit.source === 'perbaikan' && profit.repair) {
           transactionData.invoice = profit.repair.invoice || 'N/A';
           transactionData.customer = profit.repair.customer?.name_perusahaan || 'Unknown';
+          transactionData.status = profit.repair.status || 'masuk';
           
           transactionData.items = [{
             name: profit.repair.item_repair || 'Repair Service',
-            image: null,
+            image: profit.repair.image || null,  // ✅ GUNAKAN IMAGE DARI REPAIR
             qty: 1,
           }];
         }
@@ -468,5 +471,5 @@ module.exports = {
   getRevenueStats,
   getMonthlyRevenue,
   getMonthlyRevenueBySource,
-  getRecentTransactions, // Tambahkan ini
+  getRecentTransactions, 
 };

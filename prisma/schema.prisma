@@ -12,6 +12,7 @@ model User {
   name             String
   email            String
   password         String
+  role             String        @default("admin")
   created_at       DateTime      @default(now())
   updated_at       DateTime      @updatedAt
   transactions     Transaction[]
@@ -193,7 +194,8 @@ model Repair {
   start_date   DateTime
   end_date     DateTime
   description  String
-  component    String?   
+  component    String?
+  image        String?   
   pic          String   
   dp           Float?    @default(0)
   repair_cost  Float

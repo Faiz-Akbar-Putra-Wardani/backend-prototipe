@@ -1,9 +1,8 @@
-
 const express = require('express');
 
 const router = express.Router();
 
-const { validateLogin, validateCustomer, validateCategory, validateProduct, validateDetailProduct, validateCart, validateUpdateCartQty, validateTransaction, validateRental, validateProject, validateClient, validateRepair, validateBank } = require('../utils/validators');
+const { validateLogin, validateCustomer, validateCategory, validateProduct, validateDetailProduct, validateCart, validateUpdateCartQty, validateTransaction, validateRental, validateProject, validateClient, validateRepair, validateBank, validateCreateAdmin, validateUpdateAdmin } = require('../utils/validators');
 const { handleValidationErrors, verifyToken, upload} = require('../middlewares');
 
 const loginController = require('../controllers/LoginController');
@@ -20,6 +19,7 @@ const repairController = require('../controllers/RepairController');
 const reportController = require('../controllers/reportController');
 const profitController = require('../controllers/ProfitController');
 const bankController = require('../controllers/BankController');
+const adminController = require('../controllers/adminController');
 
 const routes = [
   // Login 
@@ -27,6 +27,44 @@ const routes = [
     path: '/login', 
     middlewares: [validateLogin, handleValidationErrors], 
     handler: loginController.login 
+  },
+
+   // Admin Routes
+  { 
+    method: 'get', 
+    path: '/admins', 
+    middlewares: [verifyToken], 
+    handler: adminController.findAdmins 
+  },
+  { 
+    method: 'post', 
+    path: '/admins', 
+    middlewares: [verifyToken, validateCreateAdmin, handleValidationErrors], 
+    handler: adminController.createAdmin 
+  },
+  { 
+    method: 'get', 
+    path: '/admins/:id', 
+    middlewares: [verifyToken], 
+    handler: adminController.findAdminById 
+  },
+  { 
+    method: 'put', 
+    path: '/admins/:id', 
+    middlewares: [verifyToken, validateUpdateAdmin, handleValidationErrors], 
+    handler: adminController.updateAdmin 
+  },
+  { 
+    method: 'delete', 
+    path: '/admins/:id', 
+    middlewares: [verifyToken], 
+    handler: adminController.deleteAdmin 
+  },
+  { 
+    method: 'get', 
+    path: '/admins-all', 
+    middlewares: [verifyToken], 
+    handler: adminController.allAdmins 
   },
 
   //customers
@@ -184,54 +222,56 @@ const routes = [
   },
 
   // Transaction routes
-  { 
-    method: 'post', 
-    path: '/transactions', 
-    middlewares: [verifyToken, validateTransaction, handleValidationErrors], 
-    handler: transactionController.createTransaction 
-  },
-    { 
-    method: 'put', 
-    path: '/transactions/:id', 
-    middlewares: [verifyToken, validateTransaction, handleValidationErrors], 
-    handler: transactionController.updateTransaction 
-  },
+{ 
+  method: 'get',
+  path: '/transactions/invoice',
+  middlewares: [verifyToken], 
+  handler: transactionController.getNewInvoice 
+},
+{ 
+  method: 'put', 
+  path: '/transactions/status',  
+  middlewares: [verifyToken], 
+  handler: transactionController.updateStatus 
+},
+{
+  method: 'get',
+  path: '/transactions/by-invoice/:invoice',
+  middlewares: [verifyToken],
+  handler: transactionController.getTransactionByInvoice
+},
+{ 
+  method: 'get',
+  path: '/transactions',
+  middlewares: [verifyToken],
+  handler: transactionController.getTransactions 
+},
 
-  { 
-    method: 'get',
-    path: '/transactions',
-    middlewares: [verifyToken],
-    handler: transactionController.getTransactions 
-  },
-  { 
-    method: 'get',
-    path: '/transactions/invoice',
-    middlewares: [verifyToken], 
-    handler: transactionController.getNewInvoice 
-  },
-  {
-    method: 'get',
-    path: '/transactions/by-invoice/:invoice',
-    middlewares: [verifyToken],
-    handler: transactionController.getTransactionByInvoice
-  },
-  { method: 'put', 
-    path: '/transactions/status', 
-    middlewares: [verifyToken], 
-    handler: transactionController.updateStatus 
-  },
+{ 
+  method: 'post', 
+  path: '/transactions', 
+  middlewares: [verifyToken, validateTransaction, handleValidationErrors], 
+  handler: transactionController.createTransaction 
+},
+{ 
+  method: 'get',
+  path: '/transactions/:id',  
+  middlewares: [verifyToken], 
+  handler: transactionController.getTransactionById 
+},
+{ 
+  method: 'put', 
+  path: '/transactions/:id', 
+  middlewares: [verifyToken, validateTransaction, handleValidationErrors], 
+  handler: transactionController.updateTransaction 
+},
+{ 
+  method: "delete", 
+  path: "/transactions/:id", 
+  middlewares: [verifyToken], 
+  handler: transactionController.deleteTransaction 
+},
 
-  { 
-    method: 'get',
-    path: '/transactions/:id',
-    middlewares: [verifyToken], 
-    handler: transactionController.getTransactionById 
-  },
-  { method: "delete", 
-    path: "/transactions/:id", 
-    middlewares: [verifyToken], 
-    handler: transactionController.deleteTransaction 
-  },
 
  {
     method: 'post',
@@ -286,7 +326,6 @@ const routes = [
   middlewares: [verifyToken, validateRental, handleValidationErrors],
   handler: rentalController.updateRental
 },
-
 
   // Delete Rental
   {
@@ -392,11 +431,16 @@ const routes = [
     handler: clientController.allClients
   },
 
-  // Create Repair
+  // REPAIR
   {
     method: 'post',
     path: '/repairs',
-    middlewares: [verifyToken, validateRepair, handleValidationErrors],
+    middlewares: [
+      verifyToken, 
+      upload.single('image'),
+      validateRepair, 
+      handleValidationErrors
+    ],
     handler: repairController.createRepair
   },
   // Get All Repairs (with pagination + search)
@@ -427,11 +471,16 @@ const routes = [
     middlewares: [verifyToken],
     handler: repairController.getRepairById
   },
-  // Update Repair (all data except invoice)
+  // Update Repair - TAMBAHKAN upload.single('image')
   {
     method: 'put',
     path: '/repairs/:id',
-    middlewares: [verifyToken, validateRepair, handleValidationErrors],
+    middlewares: [
+      verifyToken, 
+      upload.single('image'), 
+      validateRepair, 
+      handleValidationErrors
+    ],
     handler: repairController.updateRepair
   },
   // Delete Repair
