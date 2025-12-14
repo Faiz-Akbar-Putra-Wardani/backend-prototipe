@@ -9,6 +9,7 @@ datasource db {
 
 model User {
   id               Int           @id @default(autoincrement())
+  uuid             String        @unique @default(uuid())
   name             String
   email            String
   password         String
@@ -23,6 +24,7 @@ model User {
 
 model Customer {
   id               Int           @id @default(autoincrement())
+  uuid             String        @unique @default(uuid())
   name_perusahaan  String
   no_telp          String
   address          String
@@ -31,13 +33,13 @@ model Customer {
   transactions     Transaction[]
   rentals          Rental[]
   repairs          Repair[]
- 
 
   @@map("customers")
 }
 
 model Category {
   id          Int        @id @default(autoincrement())
+  uuid        String     @unique @default(uuid())
   image       String?
   name        String
   created_at  DateTime   @default(now())
@@ -47,8 +49,7 @@ model Category {
   @@map("categories")
 }
 
-
-model Cart {
+model Cart { // tidak perlu uuid
   id          Int       @id @default(autoincrement())
   cashier_id  Int
   product_id  Int
@@ -64,12 +65,13 @@ model Cart {
 
 model Product {
   id                  Int                    @id @default(autoincrement())
+  uuid                String                 @unique @default(uuid())
   category_id         Int
   image               String?
   title               String
   description         String?
   sell_price          Float
-  rent_price          Float?  
+  rent_price          Float?
   stock               Int
   created_at          DateTime               @default(now())
   updated_at          DateTime               @updatedAt
@@ -77,14 +79,14 @@ model Product {
   specifications      ProductSpecification[]
   transaction_details TransactionDetail[]
   rental_details      RentalDetail[]    
-  carts            Cart[]
-  
+  carts               Cart[]
 
   @@map("products")
 }
 
 model ProductSpecification {
   id               Int       @id @default(autoincrement())
+  uuid             String    @unique @default(uuid())
   product_id       Int
   brand            String
   model            String
@@ -109,7 +111,7 @@ model ProductSpecification {
   dimension_silent String
   weight_silent    String
   created_at       DateTime  @default(now())
-  updated_at DateTime @updatedAt @default(now())
+  updated_at       DateTime  @updatedAt
   product          Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
 
   @@map("product_specifications")
@@ -117,6 +119,7 @@ model ProductSpecification {
 
 model Transaction {
   id                  Int                  @id @default(autoincrement())
+  uuid                String               @unique @default(uuid())
   cashier_id          Int
   customer_id         Int?
   invoice             String               @unique
@@ -140,6 +143,7 @@ model Transaction {
 
 model TransactionDetail {
   id              Int          @id @default(autoincrement())
+  uuid            String       @unique @default(uuid())
   transaction_id  Int
   product_id      Int
   qty             Int
@@ -153,23 +157,25 @@ model TransactionDetail {
 }
 
 model Rental {
-  id           Int       @id @default(autoincrement())
-  customer_id  Int
-  invoice      String     @unique
-  dp           Float?     @default(0)
-  total_rent_price  Float
-  status       String      // ongoing, returned, late, cancelled
-  created_at   DateTime    @default(now())
-  updated_at   DateTime    @updatedAt
-  customer     Customer    @relation(fields: [customer_id], references: [id], onDelete: Cascade)
-  details      RentalDetail[]
-  profits      Profit[]
+  id               Int       @id @default(autoincrement())
+  uuid             String    @unique @default(uuid())
+  customer_id      Int
+  invoice          String     @unique
+  dp               Float?     @default(0)
+  total_rent_price Float
+  status           String
+  created_at       DateTime   @default(now())
+  updated_at       DateTime   @updatedAt
+  customer         Customer   @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  details          RentalDetail[]
+  profits          Profit[]
 
   @@map("rentals")
 }
 
 model RentalDetail {
   id          Int       @id @default(autoincrement())
+  uuid        String    @unique @default(uuid())
   rental_id   Int
   product_id  Int
   qty         Int       @default(1)
@@ -185,9 +191,9 @@ model RentalDetail {
   @@map("rental_details")
 }
 
-
 model Repair {
   id           Int       @id @default(autoincrement())
+  uuid         String    @unique @default(uuid())
   customer_id  Int
   item_repair  String 
   invoice      String     @unique
@@ -199,36 +205,35 @@ model Repair {
   pic          String   
   dp           Float?    @default(0)
   repair_cost  Float
-  status       String      // process, completed
+  status       String
   created_at   DateTime    @default(now())
   updated_at   DateTime    @updatedAt
   customer     Customer    @relation(fields: [customer_id], references: [id], onDelete: Cascade)
   profits      Profit[]
-  //pic
-  //dp opsional
-  //component opsional
 
   @@map("repairs")
 }
 
 model Profit {
   id             Int        @id @default(autoincrement())
-  source         String      // sale, rental, repair
-  transaction_id Int?        // untuk penjualan
-  rental_id      Int?        // untuk sewa
-  repair_id      Int?        // untuk perbaikan
+  uuid           String     @unique @default(uuid())
+  source         String
+  transaction_id Int?
+  rental_id      Int?
+  repair_id      Int?
   total          Float
   created_at     DateTime    @default(now())
 
-  transaction    Transaction? @relation(fields: [transaction_id], references: [id])
-  rental         Rental?      @relation(fields: [rental_id], references: [id])
-  repair         Repair?      @relation(fields: [repair_id], references: [id])
+  transaction    Transaction? @relation(fields: [transaction_id], references: [id], onDelete: Cascade)
+  rental         Rental?      @relation(fields: [rental_id], references: [id], onDelete: Cascade)
+  repair         Repair?      @relation(fields: [repair_id], references: [id], onDelete: Cascade)
 
   @@map("profits")
 }
 
 model Project {
   id           Int       @id @default(autoincrement())
+  uuid         String    @unique @default(uuid())
   image        String
   project_name String
   location     String
@@ -240,6 +245,7 @@ model Project {
 
 model Partnership {
   id         Int       @id @default(autoincrement())
+  uuid       String    @unique @default(uuid())
   name       String
   image      String     
   created_at DateTime  @default(now())
@@ -250,9 +256,10 @@ model Partnership {
 
 model Bank {
   id              Int      @id @default(autoincrement())
-  account_holder  String   // Nama pemilik (Atas Nama)
-  bank_name       String   // Nama Bank (contoh: Bank BRI, Bank MANDIRI)
-  account_number  String   @unique // Nomor Rekening
+  uuid            String   @unique @default(uuid())
+  account_holder  String
+  bank_name       String
+  account_number  String   @unique
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 

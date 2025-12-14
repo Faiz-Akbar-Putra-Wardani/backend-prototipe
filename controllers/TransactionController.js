@@ -7,7 +7,6 @@ const prisma = require("../prisma/client");
 // Import function untuk menghasilkan invoice acak
 const { generateUniqueInvoice } = require('../utils/generateUniqueInvoice');
 
-// Fungsi untuk membuat transaksi
 const createTransaction = async (req, res) => {
     try {
         // Generate invoice
@@ -15,7 +14,7 @@ const createTransaction = async (req, res) => {
 
         // Input dari frontend
         const cashierId = parseInt(req.userId);
-        const customerId = req.body.customer_id ? parseInt(req.body.customer_id) : null;
+        const customerUuid = req.body.customer_id; 
         const subtotal = parseFloat(req.body.subtotal) || 0;
         const subtotalPlusExtra = parseFloat(req.body.subtotalPlusExtra) || 0;
         const extra = parseFloat(req.body.extra) || 0;
@@ -26,6 +25,7 @@ const createTransaction = async (req, res) => {
         const grandTotal = parseFloat(req.body.grand_total);
         const status = req.body.status;
 
+
         // Validasi wajib
         if (isNaN(cashierId) || isNaN(grandTotal)) {
             return res.status(400).json({
@@ -35,6 +35,32 @@ const createTransaction = async (req, res) => {
                 },
             });
         }
+
+        let customerId = null;
+        if (customerUuid) {
+            console.log("🔍 Searching customer with UUID:", customerUuid);
+            
+            const customerExists = await prisma.customer.findUnique({
+                where: { uuid: customerUuid }
+            });
+
+            console.log(" Customer found:", customerExists);
+
+            if (!customerExists) {
+                console.log("Customer NOT FOUND with UUID:", customerUuid);
+                return res.status(404).json({
+                    meta: {
+                        success: false,
+                        message: "Customer tidak ditemukan",
+                    },
+                });
+            }
+
+            customerId = customerExists.id; 
+        } else {
+            console.log(" No customer_id provided, will save as NULL");
+        }
+
 
         // VALIDASI STATUS
         const validStatuses = ['proses', 'dikirim', 'selesai'];
@@ -88,7 +114,7 @@ const createTransaction = async (req, res) => {
         }
 
         //  VALIDASI NEGO
-        const maxNego = subtotalPlusExtra - pphNominal
+        const maxNego = subtotalPlusExtra - pphNominal;
 
         if (nego > maxNego) {
             return res.status(422).json({
@@ -96,7 +122,7 @@ const createTransaction = async (req, res) => {
                 success: false,
                 message: "Harga nego tidak boleh melebihi total sebelum nego",
               },
-            })
+            });
         }
 
         if (nego < 0) {
@@ -105,14 +131,14 @@ const createTransaction = async (req, res) => {
                 success: false,
                 message: "Harga nego tidak boleh kurang dari 0",
               },
-            })
+            });
         }
 
         // 1. Simpan transaksi utama
         const transaction = await prisma.transaction.create({
             data: {
                 cashier_id: cashierId,
-                customer_id: customerId,
+                customer_id: customerId, 
                 invoice,
                 subtotal,
                 subtotalPlusExtra,
@@ -125,7 +151,6 @@ const createTransaction = async (req, res) => {
                 status,
             },
         });
-
         // 2. Ambil semua cart milik kasir
         const carts = await prisma.cart.findMany({
             where: { cashier_id: cashierId },
@@ -142,9 +167,8 @@ const createTransaction = async (req, res) => {
             });
         }
 
-        // 3. Loop item cart → simpan detail + profit + update stok
+        // 3. Loop item cart → simpan detail + profit
         for (const cart of carts) {
-            // Simpan detail transaksi
             await prisma.transactionDetail.create({
                 data: {
                     transaction_id: transaction.id,
@@ -153,15 +177,6 @@ const createTransaction = async (req, res) => {
                     price: parseFloat(cart.price),
                 },
             });
-
-            // Hitung total jual (untuk profit)
-            const totalSellPrice = cart.product.sell_price * cart.qty;
-
-            // Update stok
-            // await prisma.product.update({
-            //     where: { id: cart.product_id },
-            //     data: { stock: { decrement: cart.qty } },
-            // });
         }
 
         // Simpan profit
@@ -188,7 +203,7 @@ const createTransaction = async (req, res) => {
         });
 
     } catch (error) {
-        console.error(error);
+        console.error("ERROR creating transaction:", error);
         res.status(500).json({
             meta: {
                 success: false,
@@ -201,21 +216,12 @@ const createTransaction = async (req, res) => {
 
 const updateTransaction = async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const { uuid } = req.params; 
 
-    // Validasi ID
-    if (isNaN(id)) {
-      return res.status(400).json({
-        meta: {
-          success: false,
-          message: "ID transaksi tidak valid",
-        },
-      });
-    }
+    console.log("Updating transaction with UUID:", uuid);
 
-    // Cek apakah transaksi ada
     const existingTransaction = await prisma.transaction.findUnique({
-      where: { id },
+      where: { uuid },
     });
 
     if (!existingTransaction) {
@@ -228,7 +234,7 @@ const updateTransaction = async (req, res) => {
     }
 
     // Input dari frontend (invoice tidak bisa diubah)
-    const customerId = req.body.customer_id ? parseInt(req.body.customer_id) : null;
+    const customerUuid = req.body.customer_id; 
     const subtotal = parseFloat(req.body.subtotal) || 0;
     const subtotalPlusExtra = parseFloat(req.body.subtotalPlusExtra) || 0;
     const extra = parseFloat(req.body.extra) || 0;
@@ -247,6 +253,24 @@ const updateTransaction = async (req, res) => {
           message: "Input tidak valid. Periksa kembali data transaksi.",
         },
       });
+    }
+
+    let customerId = null;
+    if (customerUuid) {
+        const customerExists = await prisma.customer.findUnique({
+            where: { uuid: customerUuid }
+        });
+
+        if (!customerExists) {
+            return res.status(404).json({
+                meta: {
+                    success: false,
+                    message: "Customer tidak ditemukan",
+                },
+            });
+        }
+
+        customerId = customerExists.id; 
     }
 
     // VALIDASI STATUS
@@ -321,11 +345,10 @@ const updateTransaction = async (req, res) => {
       });
     }
 
-    // Update transaksi (invoice tetap tidak berubah)
     const updatedTransaction = await prisma.transaction.update({
-      where: { id },
+      where: { uuid },
       data: {
-        customer_id: customerId,
+        customer_id: customerId, 
         subtotal,
         subtotalPlusExtra,
         extra,
@@ -377,17 +400,54 @@ const getTransactions = async (req, res) => {
         }
       : {};
 
-    // Hitung total data
     const total = await prisma.transaction.count({ where });
 
-    // Ambil transaksi dengan pagination + relasi
     const transactions = await prisma.transaction.findMany({
       where,
-      include: {
-        customer: true,
-        cashier: true,
+      select: {
+        uuid: true,
+        invoice: true,
+        subtotal: true,
+        subtotalPlusExtra: true,
+        extra: true,
+        dp: true,
+        nego: true,
+        pph: true,
+        pph_nominal: true,
+        grand_total: true,
+        status: true,
+        created_at: true, 
+        customer: {
+          select: {
+            uuid: true,
+            name_perusahaan: true,
+            no_telp: true,
+            address: true,
+          }
+        },
+        cashier: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          }
+        },
         transaction_details: {
-          include: { product: true },
+          select: {
+            id: true,
+            qty: true,
+            price: true,
+            created_at: true,   
+            updated_at: true,   
+            product: {
+              select: {
+                uuid: true,
+                title: true,
+                description: true,
+                image: true,
+              }
+            },
+          },
         },
       },
       skip: (page - 1) * perPage,
@@ -422,25 +482,55 @@ const getTransactions = async (req, res) => {
 
 const getTransactionById = async (req, res) => {
     try {
-        const id = parseInt(req.params.id);
+        const { uuid } = req.params;
 
-        if (isNaN(id)) {
-            return res.status(400).json({
-                meta: {
-                    success: false,
-                    message: "ID transaksi tidak valid",
-                },
-            });
-        }
+        console.log("Fetching transaction with UUID:", uuid);
 
         const transaction = await prisma.transaction.findUnique({
-            where: { id },
-            include: {
-                customer: true,
-                cashier: true,
+            where: { uuid },
+            select: {
+                uuid: true,
+                invoice: true,
+                subtotal: true,
+                subtotalPlusExtra: true,
+                extra: true,
+                dp: true,
+                nego: true,
+                pph: true,
+                pph_nominal: true,
+                grand_total: true,
+                status: true,
+                created_at: true, 
+                customer: {
+                    select: {
+                        uuid: true,
+                        name_perusahaan: true,
+                        no_telp: true,
+                        address: true,
+                    }
+                },
+                cashier: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                    }
+                },
                 transaction_details: {
-                    include: {
-                        product: true,
+                    select: {
+                        id: true,
+                        qty: true,
+                        price: true,
+                        created_at: true,   
+                        updated_at: true,   
+                        product: {
+                            select: {
+                                uuid: true,
+                                title: true,
+                                description: true,
+                                image: true,
+                            }
+                        },
                     },
                 },
             },
@@ -479,6 +569,8 @@ const getTransactionByInvoice = async (req, res) => {
   try {
     const invoice = req.params.invoice;
 
+    console.log("Fetching transaction by invoice:", invoice);
+
     if (!invoice) {
       return res.status(400).json({
         meta: { success: false, message: "Invoice wajib diisi" },
@@ -487,11 +579,50 @@ const getTransactionByInvoice = async (req, res) => {
 
     const transaction = await prisma.transaction.findUnique({
       where: { invoice },
-      include: {
-        customer: true,
-        cashier: true,
+      select: {
+        uuid: true,
+        invoice: true,
+        subtotal: true,
+        subtotalPlusExtra: true,
+        extra: true,
+        dp: true,
+        nego: true,
+        pph: true,
+        pph_nominal: true,
+        grand_total: true,
+        status: true,
+        created_at: true, 
+        customer: {
+          select: {
+            uuid: true,
+            name_perusahaan: true,
+            no_telp: true,
+            address: true,
+          }
+        },
+        cashier: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          }
+        },
         transaction_details: {
-          include: { product: true },
+          select: {
+            id: true,
+            qty: true,
+            price: true,
+            created_at: true,   
+            updated_at: true,   
+            product: {
+              select: {
+                uuid: true,
+                title: true,
+                description: true,
+                image: true,
+              }
+            },
+          },
         },
       },
     });
@@ -519,6 +650,7 @@ const getTransactionByInvoice = async (req, res) => {
   }
 };
 
+// GET NEW INVOICE
 const getNewInvoice = async (req, res) => {
   try {
     const invoice = await generateUniqueInvoice();
@@ -537,15 +669,18 @@ const getNewInvoice = async (req, res) => {
 
 const updateStatus = async (req, res) => {
   try {
-    const { invoice, status } = req.body;
+    const { uuid } = req.params;
+    const { status } = req.body;
 
-    if (!invoice || !status) {
+    console.log("Updating transaction status with UUID:", uuid);
+    console.log("New status:", status);
+
+    if (!status) {
       return res.status(400).json({
-        meta: { success: false, message: "Invoice dan status wajib diisi" },
+        meta: { success: false, message: "Status wajib diisi" },
       });
     }
 
-    // VALIDASI STATUS
     const validStatuses = ['proses', 'dikirim', 'selesai'];
     if (!validStatuses.includes(status)) {
         return res.status(422).json({
@@ -556,9 +691,8 @@ const updateStatus = async (req, res) => {
         });
     }
 
-    // Cek apakah transaksi ada
     const exist = await prisma.transaction.findUnique({
-      where: { invoice },
+      where: { uuid },
     });
 
     if (!exist) {
@@ -567,10 +701,15 @@ const updateStatus = async (req, res) => {
       });
     }
 
-    // Update status
     const trx = await prisma.transaction.update({
-      where: { invoice },
+      where: { uuid },
       data: { status },
+      select: {
+        uuid: true,
+        invoice: true,
+        status: true,
+        created_at: true, 
+      }
     });
 
     res.status(200).json({
@@ -595,17 +734,13 @@ const updateStatus = async (req, res) => {
 
 const deleteTransaction = async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const { uuid } = req.params; 
 
-    if (isNaN(id)) {
-      return res.status(400).json({
-        meta: { success: false, message: "ID tidak valid" },
-      });
-    }
+    console.log("Deleting transaction with UUID:", uuid);
 
-    // Cek apakah transaksi exists
+    // ✅ Cek apakah transaksi exists by UUID
     const transaction = await prisma.transaction.findUnique({
-      where: { id },
+      where: { uuid },
     });
 
     if (!transaction) {
@@ -614,19 +749,19 @@ const deleteTransaction = async (req, res) => {
       });
     }
 
-    // Hapus detail transaksi
+    // Hapus detail transaksi (gunakan id internal)
     await prisma.transactionDetail.deleteMany({
-      where: { transaction_id: id },
+      where: { transaction_id: transaction.id },
     });
 
     // Hapus profit
     await prisma.profit.deleteMany({
-      where: { transaction_id: id },
+      where: { transaction_id: transaction.id },
     });
 
-    // Hapus transaksi utama
+    // ✅ Hapus transaksi utama by UUID
     await prisma.transaction.delete({
-      where: { id },
+      where: { uuid },
     });
 
     res.status(200).json({

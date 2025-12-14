@@ -8,14 +8,27 @@ const prisma = require("../prisma/client");
 const { generateUniqueRentalInvoice } = require("../utils/generateUniqueRentalInvoice");
 
 const { diffMonths } = require("../utils/date");
-
 const createRental = async (req, res) => {
   try {
     const invoice = await generateUniqueRentalInvoice();
 
-    const customerId = Number(req.body.customer_id);
+    const customerUuid = req.body.customer_id;
     const dp = Number(req.body.dp || 0);
     const status = req.body.status ?? "berlangsung";
+
+    // VALIDASI CUSTOMER EXISTS by UUID
+    const customerExists = await prisma.customer.findUnique({
+      where: { uuid: customerUuid }
+    });
+
+    if (!customerExists) {
+      return res.status(404).json({
+        meta: {
+          success: false,
+          message: "Customer tidak ditemukan",
+        },
+      });
+    }
 
     // VALIDASI STATUS
     const validStatuses = ['berlangsung', 'selesai'];
@@ -29,15 +42,27 @@ const createRental = async (req, res) => {
     }
 
     for (const d of req.body.details) {
+      const productExists = await prisma.product.findUnique({
+        where: { uuid: d.product_id }
+      });
+
+      if (!productExists) {
+        return res.status(404).json({
+          meta: {
+            success: false,
+            message: `Produk dengan UUID ${d.product_id} tidak ditemukan`,
+          },
+        });
+      }
+
       const startDate = new Date(d.start_date);
       const endDate = new Date(d.end_date);
 
-      // Validasi: end_date harus >= start_date
       if (endDate < startDate) {
         return res.status(422).json({
           meta: {
             success: false,
-            message: `Tanggal selesai tidak boleh lebih awal dari tanggal mulai untuk produk ID ${d.product_id}`
+            message: `Tanggal selesai tidak boleh lebih awal dari tanggal mulai untuk produk ${productExists.name}`
           }
         });
       }
@@ -48,7 +73,7 @@ const createRental = async (req, res) => {
         return res.status(422).json({
           meta: {
             success: false,
-            message: `Tanggal sewa tidak valid untuk produk ID ${d.product_id}`
+            message: `Tanggal sewa tidak valid untuk produk ${productExists.name}`
           }
         });
       }
@@ -58,7 +83,7 @@ const createRental = async (req, res) => {
 
     const rental = await prisma.rental.create({
       data: {
-        customer_id: customerId,
+        customer_id: customerExists.id,
         invoice,
         dp,
         total_rent_price: 0,
@@ -66,8 +91,11 @@ const createRental = async (req, res) => {
       },
     });
 
-    // Loop untuk insert detail + create profit
     for (const d of req.body.details) {
+      const productExists = await prisma.product.findUnique({
+        where: { uuid: d.product_id }
+      });
+
       const startDate = new Date(d.start_date);
       const endDate = new Date(d.end_date);
       const months = diffMonths(startDate, endDate);
@@ -81,7 +109,7 @@ const createRental = async (req, res) => {
       await prisma.rentalDetail.create({
         data: {
           rental_id: rental.id,
-          product_id: d.product_id,
+          product_id: productExists.id,  
           qty,
           rent_price: pricePerMonth,
           start_date: startDate,
@@ -154,23 +182,15 @@ const createRental = async (req, res) => {
   }
 };
 
+
 const updateRental = async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const { uuid } = req.params;
 
-    // Validasi ID
-    if (isNaN(id)) {
-      return res.status(400).json({
-        meta: {
-          success: false,
-          message: "ID rental tidak valid",
-        },
-      });
-    }
+    console.log("Updating rental with UUID:", uuid);
 
-    // Cek apakah rental ada
     const existingRental = await prisma.rental.findUnique({
-      where: { id },
+      where: { uuid },
     });
 
     if (!existingRental) {
@@ -182,9 +202,32 @@ const updateRental = async (req, res) => {
       });
     }
 
-    const customerId = Number(req.body.customer_id);
+    const customerUuid = req.body.customer_id;
     const dp = Number(req.body.dp || 0);
     const status = req.body.status ?? "berlangsung";
+
+    if (!customerUuid) {
+      return res.status(400).json({
+        meta: {
+          success: false,
+          message: "Customer ID tidak boleh kosong",
+        },
+      });
+    }
+
+    // VALIDASI CUSTOMER EXISTS by UUID
+    const customerExists = await prisma.customer.findUnique({
+      where: { uuid: customerUuid }
+    });
+
+    if (!customerExists) {
+      return res.status(404).json({
+        meta: {
+          success: false,
+          message: "Customer tidak ditemukan",
+        },
+      });
+    }
 
     // VALIDASI STATUS
     const validStatuses = ['berlangsung', 'selesai'];
@@ -197,8 +240,30 @@ const updateRental = async (req, res) => {
       });
     }
 
-    // Validasi tanggal untuk setiap detail
+    //  Validasi dan convert product UUID ke ID
     for (const d of req.body.details) {
+      if (!d.product_id) {
+        return res.status(400).json({
+          meta: {
+            success: false,
+            message: "Product ID tidak boleh kosong",
+          },
+        });
+      }
+
+      const productExists = await prisma.product.findUnique({
+        where: { uuid: d.product_id }
+      });
+
+      if (!productExists) {
+        return res.status(404).json({
+          meta: {
+            success: false,
+            message: `Produk dengan UUID ${d.product_id} tidak ditemukan`,
+          },
+        });
+      }
+
       const startDate = new Date(d.start_date);
       const endDate = new Date(d.end_date);
 
@@ -206,7 +271,7 @@ const updateRental = async (req, res) => {
         return res.status(422).json({
           meta: {
             success: false,
-            message: `Tanggal selesai tidak boleh lebih awal dari tanggal mulai untuk produk ID ${d.product_id}`
+            message: `Tanggal selesai tidak boleh lebih awal dari tanggal mulai`
           }
         });
       }
@@ -217,7 +282,7 @@ const updateRental = async (req, res) => {
         return res.status(422).json({
           meta: {
             success: false,
-            message: `Tanggal sewa tidak valid untuk produk ID ${d.product_id}`
+            message: `Tanggal sewa tidak valid`
           }
         });
       }
@@ -226,11 +291,16 @@ const updateRental = async (req, res) => {
     let totalRent = 0;
 
     // Hapus detail & profit lama
-    await prisma.rentalDetail.deleteMany({ where: { rental_id: id } });
-    await prisma.profit.deleteMany({ where: { rental_id: id } });
+    await prisma.rentalDetail.deleteMany({ where: { rental_id: existingRental.id } });
+    await prisma.profit.deleteMany({ where: { rental_id: existingRental.id } });
 
-    // Insert detail baru
+    // Insert detail baru dengan convert UUID ke ID
     for (const d of req.body.details) {
+      // Convert product UUID ke ID
+      const productExists = await prisma.product.findUnique({
+        where: { uuid: d.product_id }
+      });
+
       const startDate = new Date(d.start_date);
       const endDate = new Date(d.end_date);
       const months = diffMonths(startDate, endDate);
@@ -243,8 +313,8 @@ const updateRental = async (req, res) => {
 
       await prisma.rentalDetail.create({
         data: {
-          rental_id: id,
-          product_id: d.product_id,
+          rental_id: existingRental.id,
+          product_id: productExists.id,  
           qty,
           rent_price: pricePerMonth,
           start_date: startDate,
@@ -254,7 +324,7 @@ const updateRental = async (req, res) => {
 
       await prisma.profit.create({
         data: {
-          rental_id: id,
+          rental_id: existingRental.id,
           total: itemTotal,
           source: "sewa"
         }
@@ -280,11 +350,11 @@ const updateRental = async (req, res) => {
       });
     }
 
-    // Update rental header (invoice tetap tidak berubah)
+    // Update rental header
     const updatedRental = await prisma.rental.update({
-      where: { id },
+      where: { uuid },
       data: { 
-        customer_id: customerId,
+        customer_id: customerExists.id,  
         dp,
         total_rent_price: totalRent,
         status
@@ -311,138 +381,222 @@ const updateRental = async (req, res) => {
   }
 };
 
+
 // GET ALL RENTAL + PAGINATION + SEARCH
 const getRentals = async (req, res) => {
-    try {
-        const page = parseInt(req.query.page) || 1;
-        const perPage = 5;
-        const search = req.query.search ?? "";
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const perPage = 5;
+    const search = req.query.search ?? "";
 
-        const where = search
-            ? {
-                OR: [
-                    { invoice: { contains: search, mode: "insensitive" } },
-                    {
-                        customer: {
-                            name_perusahaan: { contains: search, mode: "insensitive" }
-                        }
-                    }
-                ]
+    const where = search
+      ? {
+          OR: [
+            { invoice: { contains: search, mode: "insensitive" } },
+            {
+              customer: {
+                name_perusahaan: { contains: search, mode: "insensitive" }
+              }
             }
-            : {};
+          ]
+        }
+      : {};
 
-        const total = await prisma.rental.count({ where });
+    const total = await prisma.rental.count({ where });
 
-        const rentals = await prisma.rental.findMany({
-            where,
-            include: {
-                customer: true,
-                details: {
-                    include: { product: true },
-                },
+    const rentals = await prisma.rental.findMany({
+      where,
+      select: {
+        uuid: true, 
+        invoice: true,
+        dp: true,
+        total_rent_price: true,
+        status: true,
+        created_at: true,
+        updated_at: true,
+        customer: {
+          select: {
+            uuid: true,
+            name_perusahaan: true,
+            no_telp: true,
+            address: true,
+          }
+        },
+        details: {
+          select: {
+            id: true,
+            qty: true,
+            rent_price: true,
+            start_date: true,
+            end_date: true,
+            product: {
+              select: {
+                uuid: true,
+                title: true,
+                description: true,
+              }
             },
-            skip: (page - 1) * perPage,
-            take: perPage,
-            orderBy: { id: "desc" },
-        });
+          },
+        },
+      },
+      skip: (page - 1) * perPage,
+      take: perPage,
+      orderBy: { id: "desc" },
+    });
 
-        res.status(200).json({
-            meta: {
-                success: true,
-                message: "Data rental berhasil diambil",
-                pagination: {
-                    currentPage: page,
-                    perPage,
-                    total,
-                    totalPages: Math.ceil(total / perPage),
-                },
-            },
-            data: rentals,
-        });
+    res.status(200).json({
+      meta: {
+        success: true,
+        message: "Data rental berhasil diambil",
+        pagination: {
+          currentPage: page,
+          perPage,
+          total,
+          totalPages: Math.ceil(total / perPage),
+        },
+      },
+      data: rentals,
+    });
 
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({
-            meta: { success: false, message: "Terjadi kesalahan server" },
-            errors: error.message,
-        });
-    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      meta: { success: false, message: "Terjadi kesalahan server" },
+      errors: error.message,
+    });
+  }
 };
 
-// GET RENTAL BY ID
+//  GET RENTAL BY UUID
 const getRentalById = async (req, res) => {
-    try {
-        const id = parseInt(req.params.id);
+  try {
+    const { uuid } = req.params; 
 
-        if (isNaN(id)) {
-            return res.status(400).json({
-                meta: { success: false, message: "ID rental tidak valid" },
-            });
-        }
+    console.log("Fetching rental with UUID:", uuid);
 
-        const rental = await prisma.rental.findUnique({
-            where: { id },
-            include: {
-                customer: true,
-                details: {
-                    include: { product: true },
-                },
+    const rental = await prisma.rental.findUnique({
+      where: { uuid },
+      select: {
+        uuid: true,
+        invoice: true,
+        dp: true,
+        total_rent_price: true,
+        status: true,
+        created_at: true,
+        updated_at: true,
+        customer: {
+          select: {
+            uuid: true,
+            name_perusahaan: true,
+            no_telp: true,
+            address: true,
+          }
+        },
+        details: {
+          select: {
+            id: true,
+            qty: true,
+            rent_price: true,
+            start_date: true,
+            end_date: true,
+            product: {
+              select: {
+                uuid: true,
+                title: true,
+                description: true,
+              }
             },
-        });
+          },
+        },
+      },
+    });
 
-        if (!rental) {
-            return res.status(404).json({
-                meta: { success: false, message: "Rental tidak ditemukan" },
-            });
-        }
-
-        res.status(200).json({
-            meta: {
-                success: true,
-                message: "Detail rental berhasil diambil",
-            },
-            data: rental,
-        });
-
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({
-            meta: { success: false, message: "Terjadi kesalahan server" },
-            errors: error.message,
-        });
+    if (!rental) {
+      return res.status(404).json({
+        meta: { success: false, message: "Rental tidak ditemukan" },
+      });
     }
+
+    res.status(200).json({
+      meta: {
+        success: true,
+        message: "Detail rental berhasil diambil",
+      },
+      data: rental,
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      meta: { success: false, message: "Terjadi kesalahan server" },
+      errors: error.message,
+    });
+  }
 };
 
 // GET RENTAL BY INVOICE
 const getRentalByInvoice = async (req, res) => {
-    try {
-        const invoice = req.params.invoice;
+  try {
+    const invoice = req.params.invoice;
 
-        const rental = await prisma.rental.findUnique({
-            where: { invoice },
-            include: {
-                customer: true,
-                details: { include: { product: true } },
+    console.log("Fetching rental by invoice:", invoice); 
+
+    const rental = await prisma.rental.findUnique({
+      where: { invoice },
+      select: {
+        uuid: true,
+        invoice: true,
+        dp: true,
+        total_rent_price: true,
+        status: true,
+        created_at: true,
+        updated_at: true,
+        customer: {
+          select: {
+            uuid: true,
+            name_perusahaan: true,
+            no_telp: true,
+            address: true,
+          }
+        },
+        details: {
+          select: {
+            id: true,
+            qty: true,
+            rent_price: true,
+            start_date: true,
+            end_date: true,
+            product: {
+              select: {
+                uuid: true,
+                title: true,  
+                description: true,
+                image: true,  
+              }
             },
-        });
+          },
+        },
+      },
+    });
 
-        if (!rental) {
-            return res.status(404).json({
-                meta: { success: false, message: "Rental tidak ditemukan" },
-            });
-        }
-
-        res.status(200).json({
-            meta: { success: true, message: "Data rental berdasarkan invoice" },
-            data: rental,
-        });
-
-    } catch (error) {
-        res.status(500).json({
-            meta: { success: false, message: "Terjadi kesalahan server" },
-            errors: error.message,
-        });
+    if (!rental) {
+      return res.status(404).json({
+        meta: { success: false, message: "Rental tidak ditemukan" },
+      });
     }
+
+    res.status(200).json({
+      meta: { success: true, message: "Data rental berdasarkan invoice" },
+      data: rental,
+    });
+
+  } catch (error) {
+    console.error("Error in getRentalByInvoice:", error);
+    res.status(500).json({
+      meta: { success: false, message: "Terjadi kesalahan server" },
+      errors: error.message,
+    });
+  }
 };
 
 const getNewInvoice = async (req, res) => {
@@ -461,14 +615,18 @@ const getNewInvoice = async (req, res) => {
   }
 };
 
-// UPDATE RENTAL STATUS
+//  UPDATE RENTAL STATUS ONLY (PATCH - Tanpa validasi penuh)
 const updateRentalStatus = async (req, res) => {
   try {
-    const { invoice, status } = req.body;
+    const { uuid } = req.params; 
+    const { status } = req.body;
 
-    if (!invoice || !status) {
+    console.log("Updating rental status with UUID:", uuid);
+    console.log("New status:", status);
+
+    if (!status) {
       return res.status(400).json({
-        meta: { success: false, message: "Invoice dan status wajib diisi" },
+        meta: { success: false, message: "Status wajib diisi" },
       });
     }
 
@@ -483,29 +641,34 @@ const updateRentalStatus = async (req, res) => {
       });
     }
 
-    // Cek apakah transaksi ada
+    // Cek apakah rental ada by UUID
     const exist = await prisma.rental.findUnique({
-      where: { invoice },
+      where: { uuid },
     });
 
     if (!exist) {
       return res.status(404).json({
-        meta: { success: false, message: "Transaksi tidak ditemukan" },
+        meta: { success: false, message: "Rental tidak ditemukan" },
       });
     }
 
-    // Update status
-    const trx = await prisma.rental.update({
-      where: { invoice },
+    const rental = await prisma.rental.update({
+      where: { uuid },
       data: { status },
+      select: {
+        uuid: true,
+        invoice: true,
+        status: true,
+        updated_at: true,
+      }
     });
 
     res.status(200).json({
       meta: {
         success: true,
-        message: "Status transaksi berhasil diperbarui",
+        message: "Status rental berhasil diperbarui",
       },
-      data: trx,
+      data: rental,
     });
 
   } catch (error) {
@@ -520,55 +683,49 @@ const updateRentalStatus = async (req, res) => {
   }
 };
 
-// DELETE RENTAL
 const deleteRental = async (req, res) => {
-    try {
-        const id = parseInt(req.params.id);
+  try {
+    const { uuid } = req.params; 
 
-        if (isNaN(id)) {
-          return res.status(400).json({
-            meta: { success: false, message: "ID tidak valid" },
-          });
-        }
+    console.log("Deleting rental with UUID:", uuid);
 
-        // Cek apakah rental exists
-        const rental = await prisma.rental.findUnique({
-          where: { id },
-        });
+    const rental = await prisma.rental.findUnique({
+      where: { uuid },
+    });
 
-        if (!rental) {
-          return res.status(404).json({
-            meta: { success: false, message: "Rental tidak ditemukan" },
-          });
-        }
-
-        // Hapus detail & profit dulu
-        await prisma.rentalDetail.deleteMany({ where: { rental_id: id } });
-        await prisma.profit.deleteMany({ where: { rental_id: id } });
-
-        await prisma.rental.delete({ where: { id } });
-
-        res.status(200).json({
-            meta: { success: true, message: "Rental berhasil dihapus" },
-        });
-
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({
-            meta: { success: false, message: "Gagal menghapus rental" },
-            errors: error.message,
-        });
+    if (!rental) {
+      return res.status(404).json({
+        meta: { success: false, message: "Rental tidak ditemukan" },
+      });
     }
+
+    // Hapus detail & profit dulu (pakai id internal)
+    // await prisma.rentalDetail.deleteMany({ where: { rental_id: rental.id } });
+    // await prisma.profit.deleteMany({ where: { rental_id: rental.id } });
+
+    await prisma.rental.delete({ where: { uuid } });
+
+    res.status(200).json({
+      meta: { success: true, message: "Rental berhasil dihapus" },
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      meta: { success: false, message: "Gagal menghapus rental" },
+      errors: error.message,
+    });
+  }
 };
 
 // EXPORT
 module.exports = {
-    createRental,
-    getRentals,
-    getRentalById,
-    getRentalByInvoice,
-    getNewInvoice,
-    updateRentalStatus,
-    updateRental,
-    deleteRental,
+  createRental,
+  getRentals,
+  getRentalById,
+  getRentalByInvoice,
+  getNewInvoice,
+  updateRentalStatus,
+  updateRental,
+  deleteRental,
 };

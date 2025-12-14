@@ -44,19 +44,19 @@ const routes = [
   },
   { 
     method: 'get', 
-    path: '/admins/:id', 
+    path: '/admins/:uuid', 
     middlewares: [verifyToken], 
     handler: adminController.findAdminById 
   },
   { 
     method: 'put', 
-    path: '/admins/:id', 
+    path: '/admins/:uuid', 
     middlewares: [verifyToken, validateUpdateAdmin, handleValidationErrors], 
     handler: adminController.updateAdmin 
   },
   { 
     method: 'delete', 
-    path: '/admins/:id', 
+    path: '/admins/:uuid', 
     middlewares: [verifyToken], 
     handler: adminController.deleteAdmin 
   },
@@ -79,17 +79,17 @@ const routes = [
     handler: customerController.createCustomers 
   },
   { method: 'get', 
-    path: '/customers/:id', 
+    path: '/customers/:uuid', 
     middlewares: [verifyToken], 
     handler: customerController.findCustomerById 
   },
   { method: 'put', 
-    path: '/customers/:id', 
+    path: '/customers/:uuid', 
     middlewares: [verifyToken, validateCustomer, handleValidationErrors], 
     handler: customerController.updateCustomer 
   },
   { method: 'delete', 
-    path: '/customers/:id', 
+    path: '/customers/:uuid', 
     middlewares: [verifyToken], 
     handler: customerController.deleteCustomer 
   },
@@ -111,17 +111,17 @@ const routes = [
     handler: categoryController.createCategory 
   },
   { method: 'get', 
-    path: '/categories/:id', 
+    path: '/categories/:uuid', 
     middlewares: [verifyToken], 
     handler: categoryController.findCategoryById 
   },
   { method: 'put', 
-    path: '/categories/:id', 
+    path: '/categories/:uuid', 
     middlewares: [verifyToken, upload.single('image'), validateCategory, handleValidationErrors],
     handler: categoryController.updateCategory 
   },
   { method: 'delete', 
-    path: '/categories/:id', 
+    path: '/categories/:uuid', 
     middlewares: [verifyToken], 
     handler: categoryController.deleteCategory 
   },
@@ -142,17 +142,17 @@ const routes = [
     handleValidationErrors], handler: productController.createProduct
    },
   { method: 'get', 
-    path: '/products/:id', 
+    path: '/products/:uuid', 
     middlewares: [verifyToken], 
     handler: productController.findProductById 
   },
   { method: 'put', 
-    path: '/products/:id', 
+    path: '/products/:uuid', 
     middlewares: [verifyToken, upload.single('image'), validateProduct, handleValidationErrors], 
     handler: productController.updateProduct 
   },
   { method: 'delete', 
-    path: '/products/:id', 
+    path: '/products/:uuid', 
     middlewares: [verifyToken], 
     handler: productController.deleteProduct 
   },
@@ -174,7 +174,7 @@ const routes = [
     handler: detailProductController.findDetailProducts 
   },
   { method: 'get', 
-    path: '/detail-products/:id', 
+    path: '/detail-products/:uuid', 
     middlewares: [verifyToken], 
     handler: detailProductController.findDetailProductById 
   },
@@ -184,12 +184,12 @@ const routes = [
     handler: detailProductController.createDetailProduct 
   },
   { method: 'put', 
-    path: '/detail-products/:id', 
+    path: '/detail-products/:uuid', 
     middlewares: [verifyToken, validateDetailProduct, handleValidationErrors], 
     handler: detailProductController.updateDetailProduct 
   },
   { method: 'delete', 
-    path: '/detail-products/:id', 
+    path: '/detail-products/:uuid', 
     middlewares: [verifyToken], 
     handler: detailProductController.deleteDetailProduct 
   },
@@ -221,25 +221,30 @@ const routes = [
     handler: cartController.deleteCart 
   },
 
-  // Transaction routes
+ 
+// 1. Routes dengan path SPESIFIK dulu
 { 
   method: 'get',
-  path: '/transactions/invoice',
+  path: '/transactions/invoice/new',
   middlewares: [verifyToken], 
   handler: transactionController.getNewInvoice 
 },
-{ 
-  method: 'put', 
-  path: '/transactions/status',  
-  middlewares: [verifyToken], 
-  handler: transactionController.updateStatus 
-},
+
 {
   method: 'get',
-  path: '/transactions/by-invoice/:invoice',
+  path: '/transactions/invoice/:invoice',
   middlewares: [verifyToken],
   handler: transactionController.getTransactionByInvoice
 },
+
+// 2. CRUD dengan :uuid parameter
+{ 
+  method: 'post', 
+  path: '/transactions', 
+  middlewares: [verifyToken, validateTransaction, handleValidationErrors], 
+  handler: transactionController.createTransaction 
+},
+
 { 
   method: 'get',
   path: '/transactions',
@@ -248,92 +253,81 @@ const routes = [
 },
 
 { 
-  method: 'post', 
-  path: '/transactions', 
-  middlewares: [verifyToken, validateTransaction, handleValidationErrors], 
-  handler: transactionController.createTransaction 
-},
-{ 
   method: 'get',
-  path: '/transactions/:id',  
+  path: '/transactions/:uuid',  
   middlewares: [verifyToken], 
   handler: transactionController.getTransactionById 
 },
+
 { 
   method: 'put', 
-  path: '/transactions/:id', 
+  path: '/transactions/:uuid', 
   middlewares: [verifyToken, validateTransaction, handleValidationErrors], 
   handler: transactionController.updateTransaction 
 },
+
+{ 
+  method: 'patch', 
+  path: '/transactions/:uuid/status',  
+  middlewares: [verifyToken], 
+  handler: transactionController.updateStatus 
+},
+
 { 
   method: "delete", 
-  path: "/transactions/:id", 
+  path: "/transactions/:uuid", 
   middlewares: [verifyToken], 
   handler: transactionController.deleteTransaction 
 },
 
-
- {
-    method: 'post',
-    path: '/rentals',
-    middlewares: [verifyToken, validateRental, handleValidationErrors],
-    handler: rentalController.createRental
-  },
-
-  // Get All Rentals (with pagination + search)
-  {
-    method: 'get',
-    path: '/rentals',
-    middlewares: [verifyToken],
-    handler: rentalController.getRentals
-  },
-
-  // Get Rental By ID
-  {
-    method: 'get',
-    path: '/rentals/:id',
-    middlewares: [verifyToken],
-    handler: rentalController.getRentalById
-  },
-
-   // Get New Invoice
-  {
-    method: 'get',
-    path: '/rentals/invoice/new',
-    middlewares: [verifyToken],
-    handler: rentalController.getNewInvoice
-  },
-
-  // Get Rental By Invoice
-  {
-    method: 'get',
-    path: '/rentals/invoice/:invoice',
-    middlewares: [verifyToken],
-    handler: rentalController.getRentalByInvoice
-  },
-
-  // Update Rental Status
-  {
-    method: 'put',
-    path: '/rentals/status',
-    middlewares: [verifyToken],
-    handler: rentalController.updateRentalStatus
-  },
-
-  {
+{
+  method: 'post',
+  path: '/rentals',
+  middlewares: [verifyToken, validateRental, handleValidationErrors],
+  handler: rentalController.createRental
+},
+{
+  method: 'get',
+  path: '/rentals',
+  middlewares: [verifyToken],
+  handler: rentalController.getRentals
+},
+{
+  method: 'get',
+  path: '/rentals/invoice/new',  
+  middlewares: [verifyToken],
+  handler: rentalController.getNewInvoice
+},
+{
+  method: 'get',
+  path: '/rentals/invoice/:invoice',  
+  middlewares: [verifyToken],
+  handler: rentalController.getRentalByInvoice
+},
+{
+  method: 'get',
+  path: '/rentals/:uuid',  
+  middlewares: [verifyToken],
+  handler: rentalController.getRentalById
+},
+{
+  method: 'patch',
+  path: '/rentals/:uuid/status',
+  middlewares: [verifyToken],
+  handler: rentalController.updateRentalStatus
+},
+{
   method: 'put',
-  path: '/rentals/:id',
+  path: '/rentals/:uuid',
   middlewares: [verifyToken, validateRental, handleValidationErrors],
   handler: rentalController.updateRental
 },
-
-  // Delete Rental
-  {
-    method: 'delete',
-    path: '/rentals/:id',
-    middlewares: [verifyToken],
-    handler: rentalController.deleteRental
-  },
+{
+  method: 'delete',
+  path: '/rentals/:uuid',
+  middlewares: [verifyToken],
+  handler: rentalController.deleteRental
+},
 
     // Project Routes
   {
@@ -355,13 +349,13 @@ const routes = [
   },
   {
     method: 'get',
-    path: '/projects/:id',
+    path: '/projects/:uuid',
     middlewares: [verifyToken],
     handler: projectController.findprojectById
   },
   {
     method: 'put',
-    path: '/projects/:id',
+    path: '/projects/:uuid',
     middlewares: [
       verifyToken,
       upload.single('image'),
@@ -372,7 +366,7 @@ const routes = [
   },
   {
     method: 'delete',
-    path: '/projects/:id',
+    path: '/projects/:uuid',
     middlewares: [verifyToken],
     handler: projectController.deleteProject
   },
@@ -403,13 +397,13 @@ const routes = [
   },
   {
     method: 'get',
-    path: '/clients/:id',
+    path: '/clients/:uuid',
     middlewares: [verifyToken],
     handler: clientController.findClientsById
   },
   {
     method: 'put',
-    path: '/clients/:id',
+    path: '/clients/:uuid',
     middlewares: [
       verifyToken,
       upload.single('image'),
@@ -420,7 +414,7 @@ const routes = [
   },
   {
     method: 'delete',
-    path: '/clients/:id',
+    path: '/clients/:uuid',
     middlewares: [verifyToken],
     handler: clientController.deleteClient
   },
@@ -467,14 +461,20 @@ const routes = [
   // Get Repair By ID
   {
     method: 'get',
-    path: '/repairs/:id',
+    path: '/repairs/:uuid',
     middlewares: [verifyToken],
     handler: repairController.getRepairById
   },
   // Update Repair - TAMBAHKAN upload.single('image')
   {
+  method: 'patch',
+  path: '/repairs/:uuid/status',
+  middlewares: [verifyToken],
+  handler: repairController.updateRepairStatus
+},
+  {
     method: 'put',
-    path: '/repairs/:id',
+    path: '/repairs/:uuid',
     middlewares: [
       verifyToken, 
       upload.single('image'), 
@@ -486,7 +486,7 @@ const routes = [
   // Delete Repair
   {
     method: 'delete',
-    path: '/repairs/:id',
+    path: '/repairs/:uuid',
     middlewares: [verifyToken],
     handler: repairController.deleteRepair
   },
@@ -562,19 +562,19 @@ const routes = [
   },
   {
     method: 'get',
-    path: '/banks/:id',
+    path: '/banks/:uuid',
     middlewares: [verifyToken],
     handler: bankController.findBankById
   },
   {
     method: 'put',
-    path: '/banks/:id',
+    path: '/banks/:uuid',
     middlewares: [verifyToken, validateBank, handleValidationErrors],
     handler: bankController.updateBank
   },
   {
     method: 'delete',
-    path: '/banks/:id',
+    path: '/banks/:uuid',
     middlewares: [verifyToken],
     handler: bankController.deleteBank
   },

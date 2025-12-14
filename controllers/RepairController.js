@@ -1,14 +1,18 @@
 // Import express untuk membuat aplikasi web
 const express = require("express");
 
+
 // Import prisma client untuk berinteraksi dengan database
 const prisma = require("../prisma/client");
+
 
 // Import fs untuk mengelola file
 const fs = require("fs");
 
+
 // Import function untuk menghasilkan invoice unik repair
 const { generateUniqueRepairInvoice } = require('../utils/generateUniqueRepair');
+
 
 // Fungsi untuk membuat transaksi perbaikan
 const createRepair = async (req, res) => {
@@ -16,8 +20,9 @@ const createRepair = async (req, res) => {
     // Generate invoice repair
     const invoice = await generateUniqueRepairInvoice();
 
+
     // Input dari frontend
-    const customerId = parseInt(req.body.customer_id);
+    const customerUuid = req.body.customer_id;  
     const itemRepair = req.body.item_repair;
     const startDate = new Date(req.body.start_date);
     const endDate = new Date(req.body.end_date);
@@ -28,10 +33,12 @@ const createRepair = async (req, res) => {
     const repairCost = parseFloat(req.body.repair_cost);
     const status = req.body.status;
 
-    // VALIDASI CUSTOMER EXISTS
+
+    // VALIDASI CUSTOMER EXISTS by UUID
     const customerExists = await prisma.customer.findUnique({
-      where: { id: customerId }
+      where: { uuid: customerUuid }  
     });
+
 
     if (!customerExists) {
       return res.status(404).json({
@@ -41,6 +48,7 @@ const createRepair = async (req, res) => {
         },
       });
     }
+
 
     // VALIDASI TANGGAL
     if (endDate < startDate) {
@@ -52,6 +60,7 @@ const createRepair = async (req, res) => {
       });
     }
 
+
     // VALIDASI DP
     if (dp > repairCost) {
       return res.status(422).json({
@@ -62,6 +71,7 @@ const createRepair = async (req, res) => {
       });
     }
 
+
     if (dp < 0) {
       return res.status(422).json({
         meta: {
@@ -70,6 +80,7 @@ const createRepair = async (req, res) => {
         },
       });
     }
+
 
     // VALIDASI STATUS
     const validStatuses = ['masuk', 'proses', 'selesai'];
@@ -82,23 +93,49 @@ const createRepair = async (req, res) => {
       });
     }
 
-    // 1. Simpan transaksi perbaikan
+
+    // 1. Simpan transaksi perbaikan menggunakan customer.id internal
     const repair = await prisma.repair.create({
       data: {
-        customer_id: customerId,
+        customer_id: customerExists.id,  
         item_repair: itemRepair,
         invoice,
         start_date: startDate,
         end_date: endDate,
         description,
         component,
-        image: req.file ? req.file.path : null,  // Tambahkan image
+        image: req.file ? req.file.path : null,
         pic,
         dp,
         repair_cost: repairCost,
         status,
       },
+      select: {
+        id: true,
+        uuid: true,
+        customer_id: true,
+        item_repair: true,
+        invoice: true,
+        start_date: true,
+        end_date: true,
+        description: true,
+        component: true,
+        image: true,
+        pic: true,
+        dp: true,
+        repair_cost: true,
+        status: true,
+        created_at: true,
+        updated_at: true,
+        customer: {
+          select: {
+            uuid: true,
+            name_perusahaan: true,
+          }
+        }
+      }
     });
+
 
     // 2. Simpan profit untuk perbaikan
     await prisma.profit.create({
@@ -109,26 +146,31 @@ const createRepair = async (req, res) => {
       },
     });
 
+    const { id, ...repairResponse } = repair;
+
+
     // Response sukses
     res.status(201).json({
       meta: {
         success: true,
         message: "Transaksi perbaikan berhasil dibuat",
       },
-      data: repair,
+      data: repairResponse,
     });
 
+
   } catch (error) {
-    console.error(error);
+    console.error("Error in createRepair:", error);
     res.status(500).json({
       meta: {
         success: false,
         message: "Terjadi kesalahan pada server",
       },
-      errors: error.message,
+      errors: [{ msg: error.message, path: "general" }],
     });
   }
 };
+
 
 // Fungsi untuk mengambil semua data perbaikan dengan pagination dan search
 const getRepairs = async (req, res) => {
@@ -136,6 +178,7 @@ const getRepairs = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const perPage = 5;
     const search = req.query.search || "";
+
 
     const where = search
       ? {
@@ -151,19 +194,44 @@ const getRepairs = async (req, res) => {
         }
       : {};
 
+
     // Hitung total data
     const total = await prisma.repair.count({ where });
+
 
     // Ambil data perbaikan dengan pagination + relasi
     const repairs = await prisma.repair.findMany({
       where,
-      include: {
-        customer: true,
+      select: {
+        uuid: true,
+        customer_id: true,
+        item_repair: true,
+        invoice: true,
+        start_date: true,
+        end_date: true,
+        description: true,
+        component: true,
+        image: true,
+        pic: true,
+        dp: true,
+        repair_cost: true,
+        status: true,
+        created_at: true,
+        updated_at: true,
+        customer: {
+          select: {
+            uuid: true,
+            name_perusahaan: true,
+            no_telp: true,
+            address: true,
+          }
+        },
       },
       skip: (page - 1) * perPage,
       take: perPage,
       orderBy: { id: "desc" },
     });
+
 
     res.status(200).json({
       meta: {
@@ -179,37 +247,56 @@ const getRepairs = async (req, res) => {
       data: repairs,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Error in getRepairs:", error);
     res.status(500).json({
       meta: {
         success: false,
         message: "Terjadi kesalahan pada server",
       },
-      errors: error.message,
+      errors: [{ msg: error.message, path: "general" }],
     });
   }
 };
 
-// Fungsi untuk mengambil detail perbaikan berdasarkan ID
+
+// Fungsi untuk mengambil detail perbaikan berdasarkan UUID
 const getRepairById = async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const { uuid } = req.params;
 
-    if (isNaN(id)) {
-      return res.status(400).json({
-        meta: {
-          success: false,
-          message: "ID perbaikan tidak valid",
-        },
-      });
-    }
+
+    console.log("Fetching repair with UUID:", uuid);
+
 
     const repair = await prisma.repair.findUnique({
-      where: { id },
-      include: {
-        customer: true,
+      where: { uuid },
+      select: {
+        uuid: true,
+        customer_id: true,
+        item_repair: true,
+        invoice: true,
+        start_date: true,
+        end_date: true,
+        description: true,
+        component: true,
+        image: true,
+        pic: true,
+        dp: true,
+        repair_cost: true,
+        status: true,
+        created_at: true,
+        updated_at: true,
+        customer: {
+          select: {
+            uuid: true,
+            name_perusahaan: true,
+            no_telp: true,
+            address: true,
+          }
+        },
       },
     });
+
 
     if (!repair) {
       return res.status(404).json({
@@ -220,6 +307,7 @@ const getRepairById = async (req, res) => {
       });
     }
 
+
     res.status(200).json({
       meta: {
         success: true,
@@ -228,22 +316,25 @@ const getRepairById = async (req, res) => {
       data: repair,
     });
 
+
   } catch (error) {
-    console.error(error);
+    console.error("Error in getRepairById:", error);
     res.status(500).json({
       meta: {
         success: false,
         message: "Terjadi kesalahan pada server",
       },
-      errors: error.message,
+      errors: [{ msg: error.message, path: "general" }],
     });
   }
 };
+
 
 // Fungsi untuk mengambil detail perbaikan berdasarkan invoice
 const getRepairByInvoice = async (req, res) => {
   try {
     const invoice = req.params.invoice;
+
 
     if (!invoice) {
       return res.status(400).json({
@@ -251,18 +342,43 @@ const getRepairByInvoice = async (req, res) => {
       });
     }
 
+
     const repair = await prisma.repair.findUnique({
       where: { invoice },
-      include: {
-        customer: true,
+      select: {
+        uuid: true,
+        customer_id: true,
+        item_repair: true,
+        invoice: true,
+        start_date: true,
+        end_date: true,
+        description: true,
+        component: true,
+        image: true,
+        pic: true,
+        dp: true,
+        repair_cost: true,
+        status: true,
+        created_at: true,
+        updated_at: true,
+        customer: {
+          select: {
+            uuid: true,
+            name_perusahaan: true,
+            no_telp: true,
+            address: true,
+          }
+        },
       },
     });
+
 
     if (!repair) {
       return res.status(404).json({
         meta: { success: false, message: "Data perbaikan tidak ditemukan" },
       });
     }
+
 
     res.status(200).json({
       meta: {
@@ -272,47 +388,56 @@ const getRepairByInvoice = async (req, res) => {
       data: repair,
     });
 
+
   } catch (error) {
-    console.error(error);
+    console.error("Error in getRepairByInvoice:", error);
     res.status(500).json({
       meta: { success: false, message: "Terjadi kesalahan pada server" },
-      errors: error.message,
+      errors: [{ msg: error.message, path: "general" }],
     });
   }
 };
+
 
 // Fungsi untuk generate invoice baru
 const getNewRepairInvoice = async (req, res) => {
   try {
     const invoice = await generateUniqueRepairInvoice();
 
+
     res.status(200).json({
       meta: { success: true, message: "Invoice perbaikan baru berhasil dibuat" },
       data: { invoice }
     });
   } catch (error) {
+    console.error("Error in getNewRepairInvoice:", error);
     res.status(500).json({
       meta: { success: false, message: "Gagal membuat invoice" },
-      errors: error.message
+      errors: [{ msg: error.message, path: "general" }],
     });
   }
 };
 
+
+// Update repair by UUID
 const updateRepair = async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const { uuid } = req.params;
 
-    // Validasi ID
-    if (isNaN(id)) {
-      return res.status(400).json({
-        meta: { success: false, message: "ID perbaikan tidak valid" },
-      });
-    }
+
+    console.log("Updating repair with UUID:", uuid);
+
 
     // Cek apakah data perbaikan ada
     const existingRepair = await prisma.repair.findUnique({
-      where: { id },
+      where: { uuid },
+      select: {
+        id: true,  
+        uuid: true,
+        image: true,
+      }
     });
+
 
     if (!existingRepair) {
       return res.status(404).json({
@@ -320,8 +445,9 @@ const updateRepair = async (req, res) => {
       });
     }
 
+
     // Input dari frontend
-    const customerId = parseInt(req.body.customer_id);
+    const customerUuid = req.body.customer_id; 
     const itemRepair = req.body.item_repair;
     const startDate = new Date(req.body.start_date);
     const endDate = new Date(req.body.end_date);
@@ -332,8 +458,9 @@ const updateRepair = async (req, res) => {
     const repairCost = parseFloat(req.body.repair_cost);
     const status = req.body.status;
 
+
     // Validasi wajib
-    if (isNaN(customerId) || !itemRepair || !startDate || !endDate || !description || !pic || isNaN(repairCost) || !status) {
+    if (!customerUuid || !itemRepair || !startDate || !endDate || !description || !pic || isNaN(repairCost) || !status) {
       return res.status(400).json({
         meta: {
           success: false,
@@ -341,6 +468,23 @@ const updateRepair = async (req, res) => {
         },
       });
     }
+
+
+    // VALIDASI CUSTOMER EXISTS by UUID
+    const customerExists = await prisma.customer.findUnique({
+      where: { uuid: customerUuid }  
+    });
+
+
+    if (!customerExists) {
+      return res.status(404).json({
+        meta: {
+          success: false,
+          message: "Customer tidak ditemukan",
+        },
+      });
+    }
+
 
     // VALIDASI TANGGAL
     if (endDate < startDate) {
@@ -352,6 +496,7 @@ const updateRepair = async (req, res) => {
       });
     }
 
+
     // VALIDASI DP
     if (dp > repairCost) {
       return res.status(422).json({
@@ -362,6 +507,7 @@ const updateRepair = async (req, res) => {
       });
     }
 
+
     if (dp < 0) {
       return res.status(422).json({
         meta: {
@@ -370,6 +516,7 @@ const updateRepair = async (req, res) => {
         },
       });
     }
+
 
     // VALIDASI STATUS
     const validStatuses = ['masuk', 'proses', 'selesai'];
@@ -382,9 +529,10 @@ const updateRepair = async (req, res) => {
       });
     }
 
+
     // Prepare data update
     const dataRepair = {
-      customer_id: customerId,
+      customer_id: customerExists.id,  
       item_repair: itemRepair,
       start_date: startDate,
       end_date: endDate,
@@ -396,9 +544,11 @@ const updateRepair = async (req, res) => {
       status,
     };
 
+
     // Handle image upload jika ada file baru
     if (req.file) {
       dataRepair.image = req.file.path;
+
 
       // Hapus gambar lama jika ada
       if (existingRepair.image && fs.existsSync(existingRepair.image)) {
@@ -406,53 +556,154 @@ const updateRepair = async (req, res) => {
       }
     }
 
+
     // Update data perbaikan (KECUALI INVOICE)
     const updatedRepair = await prisma.repair.update({
-      where: { id },
+      where: { uuid },
       data: dataRepair,
+      select: {
+        id: true,
+        uuid: true,
+        customer_id: true,
+        item_repair: true,
+        invoice: true,
+        start_date: true,
+        end_date: true,
+        description: true,
+        component: true,
+        image: true,
+        pic: true,
+        dp: true,
+        repair_cost: true,
+        status: true,
+        created_at: true,
+        updated_at: true,
+        customer: {
+          select: {
+            uuid: true,
+            name_perusahaan: true,
+          }
+        }
+      }
     });
+
 
     // Update profit jika repair_cost berubah
     await prisma.profit.updateMany({
-      where: { repair_id: id },
+      where: { repair_id: existingRepair.id },
       data: { total: repairCost },
     });
+
+      // Remove id dari response
+    const { id, ...repairResponse } = updatedRepair;
+
 
     res.status(200).json({
       meta: {
         success: true,
         message: "Data perbaikan berhasil diperbarui",
       },
-      data: updatedRepair,
+      data: repairResponse,
     });
 
+
   } catch (error) {
-    console.error(error);
+    console.error("Error in updateRepair:", error);
     res.status(500).json({
       meta: {
         success: false,
         message: "Terjadi kesalahan pada server",
       },
-      errors: error.message,
+      errors: [{ msg: error.message, path: "general" }],
     });
   }
 };
 
-// Fungsi untuk menghapus data perbaikan
-const deleteRepair = async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
 
-    if (isNaN(id)) {
-      return res.status(400).json({
-        meta: { success: false, message: "ID tidak valid" },
+const updateRepairStatus = async (req, res) => {
+  try {
+    const { uuid } = req.params;
+    const { status } = req.body;
+
+
+    console.log("Updating repair status with UUID:", uuid);
+    console.log("New status:", status);
+
+
+    // Cek apakah data perbaikan ada
+    const existingRepair = await prisma.repair.findUnique({
+      where: { uuid },
+    });
+
+
+    if (!existingRepair) {
+      return res.status(404).json({
+        meta: { success: false, message: "Data perbaikan tidak ditemukan" },
       });
     }
 
-    // Ambil data repair untuk cek image
-    const repair = await prisma.repair.findUnique({
-      where: { id },
+
+    // VALIDASI STATUS
+    const validStatuses = ['masuk', 'proses', 'selesai'];
+    if (!status || !validStatuses.includes(status)) {
+      return res.status(422).json({
+        meta: {
+          success: false,
+          message: "Status harus: 'masuk', 'proses', atau 'selesai'",
+        },
+      });
+    }
+
+
+    // Update hanya status
+    const updatedRepair = await prisma.repair.update({
+      where: { uuid },
+      data: { status },
+      select: {
+        uuid: true,
+        status: true,
+        invoice: true,
+        updated_at: true,
+      }
     });
+
+
+    res.status(200).json({
+      meta: {
+        success: true,
+        message: "Status perbaikan berhasil diperbarui",
+      },
+      data: updatedRepair,
+    });
+
+
+  } catch (error) {
+    console.error("Error in updateRepairStatus:", error);
+    res.status(500).json({
+      meta: {
+        success: false,
+        message: "Terjadi kesalahan pada server",
+      },
+      errors: [{ msg: error.message, path: "general" }],
+    });
+  }
+};
+
+
+// Fungsi untuk menghapus data perbaikan by UUID
+const deleteRepair = async (req, res) => {
+  try {
+    const { uuid } = req.params;
+
+
+    console.log("Deleting repair with UUID:", uuid);
+
+
+    // Ambil data repair untuk cek image dan id untuk profit
+    const repair = await prisma.repair.findUnique({
+      where: { uuid },
+    });
+
 
     if (!repair) {
       return res.status(404).json({
@@ -460,20 +711,24 @@ const deleteRepair = async (req, res) => {
       });
     }
 
-    // Hapus profit terkait
-    await prisma.profit.deleteMany({
-      where: { repair_id: id },
-    });
+
+    // Hapus profit terkait (masih pakai repair_id internal)
+    // await prisma.profit.deleteMany({
+    //   where: { repair_id: repair.id },
+    // });
+
 
     // Hapus data perbaikan
     await prisma.repair.delete({
-      where: { id },
+      where: { uuid },
     });
+
 
     // Hapus file image jika ada
     if (repair.image && fs.existsSync(repair.image)) {
       fs.unlinkSync(repair.image);
     }
+
 
     res.status(200).json({
       meta: {
@@ -482,13 +737,14 @@ const deleteRepair = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error(error);
+    console.error("Error in deleteRepair:", error);
     res.status(500).json({
       meta: { success: false, message: "Gagal menghapus data perbaikan" },
-      errors: error.message,
+      errors: [{ msg: error.message, path: "general" }],
     });
   }
 };
+
 
 // Export fungsi
 module.exports = {
@@ -498,5 +754,6 @@ module.exports = {
   getRepairByInvoice,
   getNewRepairInvoice,
   updateRepair,  
+  updateRepairStatus,
   deleteRepair
 };

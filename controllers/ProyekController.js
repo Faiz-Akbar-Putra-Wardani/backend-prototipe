@@ -2,12 +2,12 @@ const express = require("express");
 const prisma = require("../prisma/client");
 const fs = require("fs");
 
-const findProjects= async (req, res) => {
+// Ambil semua projects (pagination + search)
+const findProjects = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 5;
         const skip = (page - 1) * limit;
-
         const search = req.query.search || '';
 
         const projects = await prisma.project.findMany({
@@ -17,7 +17,7 @@ const findProjects= async (req, res) => {
                 },
             },
             select: {
-                id: true,
+                uuid: true,  
                 project_name: true,
                 location: true,
                 image: true,
@@ -42,7 +42,6 @@ const findProjects= async (req, res) => {
         const totalPages = Math.ceil(totalProjects / limit);
 
         res.status(200).send({
-            
             meta: {
                 success: true,
                 message: "Berhasil mendapatkan semua proyek",
@@ -56,24 +55,43 @@ const findProjects= async (req, res) => {
             },
         });
     } catch (error) {
+        console.error("Error in findProjects:", error);
         res.status(500).send({
             meta: {
                 success: false,
                 message: "Terjadi kesalahan di server",
             },
-            errors: error,
+            errors: [{ msg: error.message, path: "general" }],
         });
     }
 };
 
+// Buat project baru
 const createproject = async (req, res) => {
-    try{
+    try {
+        // Validasi file image
+        if (!req.file) {
+            return res.status(422).send({
+                success: false,
+                message: "Image is required",
+                errors: [{ msg: "Image harus diupload", path: "image" }],
+            });
+        }
+
         const project = await prisma.project.create({
             data: {
                 project_name: req.body.project_name,
                 location: req.body.location,
                 image: req.file.path,
             },
+            select: {
+                uuid: true,  
+                project_name: true,
+                location: true,
+                image: true,
+                created_at: true,
+                updated_at: true,
+            }
         });
 
         res.status(201).send({
@@ -84,28 +102,30 @@ const createproject = async (req, res) => {
             data: project,
         });
     } catch (error) {
+        console.error("Error in createproject:", error);
         res.status(500).send({
             meta: {
                 success: false,
                 message: "Terjadi kesalahan di server",
             },
-            errors: error,
+            errors: [{ msg: error.message, path: "general" }],
         });
     }
 };
 
+// Ambil project by UUID
 const findprojectById = async (req, res) => {
-   
-    const { id } = req.params;
+    const { uuid } = req.params;  
 
     try {
-        
+        console.log("Fetching project with UUID:", uuid);
+
         const project = await prisma.project.findUnique({
             where: {
-                id: Number(id),
+                uuid: uuid,  
             },
             select: {
-                id: true,
+                uuid: true,  
                 project_name: true,
                 location: true,
                 image: true,
@@ -116,10 +136,9 @@ const findprojectById = async (req, res) => {
 
         if (!project) {
             return res.status(404).send({
-
                 meta: {
                     success: false,
-                    message: `Proyek dengan ID: ${id} tidak ditemukan`,
+                    message: `Proyek dengan UUID: ${uuid} tidak ditemukan`,
                 },
             });
         }
@@ -127,51 +146,73 @@ const findprojectById = async (req, res) => {
         res.status(200).send({
             meta: {
                 success: true,
-                message: `Berhasil mendapatkan proyek dengan ID: ${id}`,
+                message: `Berhasil mendapatkan proyek dengan UUID: ${uuid}`,
             },
             data: project,
         });
     } catch (error) {
+        console.error("Error in findprojectById:", error);
         res.status(500).send({
             meta: {
                 success: false,
                 message: "Terjadi kesalahan di server",
             },
-            errors: error,
+            errors: [{ msg: error.message, path: "general" }],
         });
     }
 };
 
+// Update project by UUID
 const updateproject = async (req, res) => {
-    
-    const { id } = req.params;
+    const { uuid } = req.params;  
 
     try {
-        const dataProject = {
-            project_name: req.body.name,
-            location: req.body.location,
-            updated_at: new Date(),
-        };
-        if (req.file) {
+        console.log("Updating project with UUID:", uuid);
 
-            dataProject.image = req.file.path;
+        // Cek apakah project ada
+        const existingProject = await prisma.project.findUnique({
+            where: {
+                uuid: uuid,  
+            },
+        });
 
-            const project = await prisma.project.findUnique({
-                where: {
-                    id: Number(id),
+        if (!existingProject) {
+            return res.status(404).send({
+                meta: {
+                    success: false,
+                    message: `Proyek dengan UUID: ${uuid} tidak ditemukan`,
                 },
             });
+        }
 
-            if (project.image) {
-                fs.unlinkSync(project.image);
+        const dataProject = {
+            project_name: req.body.project_name, 
+            location: req.body.location,
+        };
+
+        // Handle image upload
+        if (req.file) {
+            dataProject.image = req.file.path;
+
+            // Hapus gambar lama jika ada
+            if (existingProject.image && fs.existsSync(existingProject.image)) {
+                fs.unlinkSync(existingProject.image);
             }
         }
 
-        const project= await prisma.project.update({
+        const project = await prisma.project.update({
             where: {
-                id: Number(id),
+                uuid: uuid,  
             },
             data: dataProject,
+            select: {
+                uuid: true,  
+                project_name: true,
+                location: true,
+                image: true,
+                created_at: true,
+                updated_at: true,
+            }
         });
 
         res.status(200).send({
@@ -182,23 +223,27 @@ const updateproject = async (req, res) => {
             data: project,
         });
     } catch (error) {
+        console.error("Error in updateproject:", error);
         res.status(500).send({
             meta: {
                 success: false,
                 message: "Terjadi kesalahan di server",
             },
-            errors: error,
+            errors: [{ msg: error.message, path: "general" }],
         });
     }
 };
 
+// Hapus project by UUID
 const deleteProject = async (req, res) => {
-    const { id } = req.params;
+    const { uuid } = req.params;  
 
     try {
+        console.log("Deleting project with UUID:", uuid);
+
         const project = await prisma.project.findUnique({
             where: {
-                id: Number(id),
+                uuid: uuid,  
             },
         });
 
@@ -206,24 +251,19 @@ const deleteProject = async (req, res) => {
             return res.status(404).send({
                 meta: {
                     success: false,
-                    message: `Proyek dengan ID: ${id} tidak ditemukan`,
+                    message: `Proyek dengan UUID: ${uuid} tidak ditemukan`,
                 },
             });
         }
 
         await prisma.project.delete({
             where: {
-                id: Number(id),
+                uuid: uuid,  
             },
         });
 
-        if (project.image) {
-            const imagePath = project.image;
-            const fileName = imagePath.substring(imagePath.lastIndexOf("/") + 1);
-            const filePath = `uploads/${fileName}`;
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-            }
+        if (project.image && fs.existsSync(project.image)) {
+            fs.unlinkSync(project.image);
         }
 
         res.status(200).send({
@@ -233,22 +273,23 @@ const deleteProject = async (req, res) => {
             },
         });
     } catch (error) {
+        console.error("Error in deleteProject:", error);
         res.status(500).send({
             meta: {
                 success: false,
                 message: "Terjadi kesalahan di server",
             },
-            errors: error,
+            errors: [{ msg: error.message, path: "general" }],
         });
     }
 };
 
+// Ambil semua projects (tanpa pagination)
 const allProjects = async (req, res) => {
     try {
-        
         const projects = await prisma.project.findMany({
             select: {
-                id: true,
+                uuid: true,  
                 project_name: true,
                 location: true,
                 image: true,
@@ -260,9 +301,7 @@ const allProjects = async (req, res) => {
             }
         });
 
-        // Kirim respons
         res.status(200).send({
-            // Meta untuk respons dalam format JSON
             meta: {
                 success: true,
                 message: "Berhasil mendapatkan semua proyek",
@@ -270,16 +309,16 @@ const allProjects = async (req, res) => {
             data: projects,
         });
     } catch (error) {
+        console.error("Error in allProjects:", error);
         res.status(500).send({
             meta: {
                 success: false,
                 message: "Terjadi kesalahan di server",
             },
-            errors: error,
+            errors: [{ msg: error.message, path: "general" }],
         });
     }
 };
-
 
 module.exports = {
     findProjects,

@@ -1,11 +1,12 @@
 const { body } = require("express-validator");
 
-// untuk POST /carts
+
 const validateCart = [
   body("product_id")
     .notEmpty()
     .withMessage("Product is required")
-    .isInt(),
+    .isUUID() // ✅ UBAH: Dari isInt() ke isUUID()
+    .withMessage("Product ID must be a valid UUID"), 
 
   body("qty")
     .notEmpty()
@@ -14,7 +15,7 @@ const validateCart = [
     .withMessage("Qty minimal 1"),
 ];
 
-// untuk PUT /carts/:id
+
 const validateUpdateCartQty = [
   body("qty")
     .notEmpty()

@@ -296,13 +296,36 @@ const getRecentTransactions = async (req, res) => {
     const limit = parseInt(req.query.limit) || 5;
     const source = req.query.source;
 
-    console.log('📊 getRecentTransactions called');
-    console.log('  Limit:', limit);
-    console.log('  Source:', source);
-
     const where = {};
     if (source && ['penjualan', 'sewa', 'perbaikan'].includes(source)) {
       where.source = source;
+    }
+
+    //  TAMBAHKAN FILTER: Hanya ambil profit yang referensinya masih ada
+    where.OR = [
+      {
+        source: 'penjualan',
+        transaction: { isNot: null } 
+      },
+      {
+        source: 'sewa',
+        rental: { isNot: null } 
+      },
+      {
+        source: 'perbaikan',
+        repair: { isNot: null } 
+      }
+    ];
+
+    //  Jika ada filter source, sesuaikan OR filter
+    if (source) {
+      if (source === 'penjualan') {
+        where.OR = [{ source: 'penjualan', transaction: { isNot: null } }];
+      } else if (source === 'sewa') {
+        where.OR = [{ source: 'sewa', rental: { isNot: null } }];
+      } else if (source === 'perbaikan') {
+        where.OR = [{ source: 'perbaikan', repair: { isNot: null } }];
+      }
     }
 
     // Get transaksi terbaru dengan detail lengkap
@@ -360,7 +383,7 @@ const getRecentTransactions = async (req, res) => {
             invoice: true,
             status: true,
             item_repair: true,
-            image: true,  // ✅ TAMBAHKAN IMAGE UNTUK PERBAIKAN
+            image: true,
             customer: {
               select: {
                 name_perusahaan: true,
@@ -371,7 +394,7 @@ const getRecentTransactions = async (req, res) => {
       },
     });
 
-    console.log('📦 Profits found:', profits.length);
+    console.log(' Profits found:', profits.length);
 
     // Format data dengan error handling
     const formattedTransactions = profits.map(profit => {
@@ -387,7 +410,7 @@ const getRecentTransactions = async (req, res) => {
       };
 
       try {
-        // ✅ PENJUALAN (proses, dikirim, selesai)
+        // PENJUALAN
         if (profit.source === 'penjualan' && profit.transaction) {
           transactionData.invoice = profit.transaction.invoice || 'N/A';
           transactionData.customer = profit.transaction.customer?.name_perusahaan || 'Guest';
@@ -400,7 +423,7 @@ const getRecentTransactions = async (req, res) => {
           }));
         } 
         
-        // ✅ SEWA (berlangsung, selesai)
+        //  SEWA
         else if (profit.source === 'sewa' && profit.rental) {
           transactionData.invoice = profit.rental.invoice || 'N/A';
           transactionData.customer = profit.rental.customer?.name_perusahaan || 'Unknown';
@@ -413,7 +436,7 @@ const getRecentTransactions = async (req, res) => {
           }));
         } 
         
-        // ✅ PERBAIKAN (masuk, proses, selesai) - WITH IMAGE
+        //  PERBAIKAN
         else if (profit.source === 'perbaikan' && profit.repair) {
           transactionData.invoice = profit.repair.invoice || 'N/A';
           transactionData.customer = profit.repair.customer?.name_perusahaan || 'Unknown';
@@ -421,7 +444,7 @@ const getRecentTransactions = async (req, res) => {
           
           transactionData.items = [{
             name: profit.repair.item_repair || 'Repair Service',
-            image: profit.repair.image || null,  // ✅ GUNAKAN IMAGE DARI REPAIR
+            image: profit.repair.image || null,
             qty: 1,
           }];
         }
@@ -447,7 +470,7 @@ const getRecentTransactions = async (req, res) => {
       return transactionData;
     });
 
-    console.log('✅ Formatted transactions:', formattedTransactions.length);
+    console.log(' Formatted transactions:', formattedTransactions.length);
 
     res.status(200).json({
       success: true,
@@ -456,7 +479,7 @@ const getRecentTransactions = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error in getRecentTransactions:', error);
+    console.error('Error in getRecentTransactions:', error);
     res.status(500).json({
       success: false,
       message: "Gagal mengambil transaksi terbaru",

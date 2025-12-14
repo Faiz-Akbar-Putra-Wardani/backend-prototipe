@@ -1,8 +1,7 @@
-const express = require("express");
 const prisma = require("../prisma/client");
 const fs = require("fs");
 
-// Ambil semua produk (dengan pagination & pencarian)
+// Ambil semua produk (pagination + search)
 const findProducts = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
@@ -11,203 +10,9 @@ const findProducts = async (req, res) => {
         const search = req.query.search || "";
 
         const products = await prisma.product.findMany({
-            where: {
-                title: { contains: search },
-            },
-            select: {
-                id: true,
-                title: true,
-                description: true,
-                sell_price: true,
-                rent_price: true,
-                stock: true,
-                image: true,
-                created_at: true,
-                updated_at: true,
-                category: {
-                    select: { id: true, name: true },
-                },
-            },
-            orderBy: { id: "desc" },
-            skip,
-            take: limit,
-        });
-
-        const totalProducts = await prisma.product.count({
             where: { title: { contains: search } },
-        });
-
-        const totalPages = Math.ceil(totalProducts / limit);
-
-        res.status(200).send({
-            meta: { success: true, message: "Berhasil mengambil semua produk" },
-            data: products,
-            pagination: {
-                currentPage: page,
-                totalPages,
-                perPage: limit,
-                total: totalProducts,
-            },
-        });
-    } catch (error) {
-        res.status(500).send({
-            meta: { success: false, message: "Kesalahan internal server" },
-            errors: error.message,
-        });
-    }
-};
-
-// Tambah produk baru
-const createProduct = async (req, res) => {
-    try {
-        const product = await prisma.product.create({
-            data: {
-                title: req.body.title,
-                description: req.body.description || null,
-                sell_price: parseFloat(req.body.sell_price),
-                rent_price: req.body.rent_price
-                ? parseFloat(req.body.rent_price)
-                : null,
-                stock: parseInt(req.body.stock),
-                image: req.file ? req.file.path : null,
-                category_id: parseInt(req.body.category_id),
-            },
-            include: { category: true },
-        });
-
-        res.status(201).send({
-            meta: { success: true, message: "Produk berhasil dibuat" },
-            data: product,
-        });
-    } catch (error) {
-        res.status(500).send({
-            meta: { success: false, message: "Kesalahan internal server" },
-            errors: error.message,
-        });
-    }
-};
-
-// Ambil produk berdasarkan ID
-const findProductById = async (req, res) => {
-    const { id } = req.params;
-    try {
-        const product = await prisma.product.findUnique({
-            where: { id: Number(id) },
             select: {
-                id: true,
-                title: true,
-                description: true,
-                sell_price: true,
-                 rent_price: true,
-                stock: true,
-                image: true,
-                created_at: true,
-                updated_at: true,
-                category: {
-                    select: { id: true, name: true },
-                },
-            },
-        });
-
-        if (!product) {
-            return res.status(404).send({
-                meta: { success: false, message: `Produk dengan ID ${id} tidak ditemukan` },
-            });
-        }
-
-        res.status(200).send({
-            meta: { success: true, message: "Berhasil mengambil produk" },
-            data: product,
-        });
-    } catch (error) {
-        res.status(500).send({
-            meta: { success: false, message: "Kesalahan internal server" },
-            errors: error.message,
-        });
-    }
-};
-
-// Update produk
-const updateProduct = async (req, res) => {
-    const { id } = req.params;
-    try {
-        const dataProduct = {
-            title: req.body.title,
-            description: req.body.description || null,
-            sell_price: parseFloat(req.body.sell_price),
-            rent_price: req.body.rent_price
-            ? parseFloat(req.body.rent_price)
-            : null,
-            stock: parseInt(req.body.stock),
-            category_id: parseInt(req.body.category_id),
-        };
-
-        if (req.file) {
-            dataProduct.image = req.file.path;
-
-            const existing = await prisma.product.findUnique({ where: { id: Number(id) } });
-            if (existing && existing.image && fs.existsSync(existing.image)) {
-                fs.unlinkSync(existing.image);
-            }
-        }
-        const product = await prisma.product.update({
-            where: { id: Number(id) },
-            data: dataProduct,
-            include: { category: true },
-        });
-
-        res.status(200).send({
-            meta: { success: true, message: "Produk berhasil diperbarui" },
-            data: product,
-        });
-    } catch (error) {
-        res.status(500).send({
-            meta: { success: false, message: "Kesalahan internal server" },
-            errors: error.message,
-        });
-    }
-};
-
-// Hapus produk
-const deleteProduct = async (req, res) => {
-    const { id } = req.params;
-    try {
-        const product = await prisma.product.findUnique({ where: { id: Number(id) } });
-        if (!product) {
-            return res.status(404).send({
-                meta: { success: false, message: `Produk dengan ID ${id} tidak ditemukan` },
-            });
-        }
-
-        await prisma.product.delete({ where: { id: Number(id) } });
-
-        if (product.image && fs.existsSync(product.image)) {
-            fs.unlinkSync(product.image);
-        }
-
-        res.status(200).send({
-            meta: { success: true, message: "Produk berhasil dihapus" },
-        });
-    } catch (error) {
-        res.status(500).send({
-            meta: { success: false, message: "Kesalahan internal server" },
-            errors: error.message,
-        });
-    }
-};
-
-// Ambil produk berdasarkan kategori
-const findProductByCategoryId = async (req, res) => {
-    const { id } = req.params;
-    try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 5;
-        const skip = (page - 1) * limit;
-
-        const products = await prisma.product.findMany({
-            where: { category_id: Number(id) },
-            select: {
-                id: true,
+                uuid: true,
                 title: true,
                 description: true,
                 sell_price: true,
@@ -216,6 +21,9 @@ const findProductByCategoryId = async (req, res) => {
                 image: true,
                 created_at: true,
                 updated_at: true,
+                category: {
+                    select: { id: true, name: true },
+                },
             },
             orderBy: { id: "desc" },
             skip,
@@ -223,14 +31,11 @@ const findProductByCategoryId = async (req, res) => {
         });
 
         const total = await prisma.product.count({
-            where: { category_id: Number(id) },
+            where: { title: { contains: search } },
         });
 
         res.status(200).send({
-            meta: {
-                success: true,
-                message: `Berhasil mengambil produk dengan kategori ID ${id}`,
-            },
+            meta: { success: true, message: "Berhasil mengambil semua produk" },
             data: products,
             pagination: {
                 currentPage: page,
@@ -247,35 +52,274 @@ const findProductByCategoryId = async (req, res) => {
     }
 };
 
-// Ambil semua produk (tanpa pagination) — digunakan untuk dropdown di frontend
-const allProducts = async (req, res) => {
-  try {
-    const products = await prisma.product.findMany({
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        sell_price: true,
-        rent_price: true,
-        stock: true,
-        image: true,
-        category: {
-          select: { id: true, name: true },
-        },
-      },
-      orderBy: { id: "desc" },
-    });
+// Tambah produk baru
+const createProduct = async (req, res) => {
+    try {
+        // Safe parsing dengan validasi
+        const categoryId = parseInt(req.body.category_id);
+        const sellPrice = parseFloat(req.body.sell_price);
+        const stock = parseInt(req.body.stock);
+        
+        // Double check jika ada yang NaN (seharusnya sudah tertangkap validator)
+        if (isNaN(categoryId) || isNaN(sellPrice) || isNaN(stock)) {
+            return res.status(422).send({
+                success: false,
+                message: "Invalid input data",
+                errors: [
+                    { msg: "Category, sell price, and stock must be valid numbers", path: "general" }
+                ]
+            });
+        }
 
-    res.status(200).send({
-      meta: { success: true, message: "Berhasil mengambil semua produk (tanpa pagination)" },
-      data: products,
-    });
-  } catch (error) {
-    res.status(500).send({
-      meta: { success: false, message: "Kesalahan internal server" },
-      errors: error.message,
-    });
-  }
+        // Parse rent_price (optional)
+        let rentPrice = null;
+        if (req.body.rent_price && req.body.rent_price !== "") {
+            rentPrice = parseFloat(req.body.rent_price);
+            if (isNaN(rentPrice)) {
+                rentPrice = null;
+            }
+        }
+
+        const product = await prisma.product.create({
+            data: {
+                title: req.body.title,
+                description: req.body.description || null,
+                sell_price: sellPrice,
+                rent_price: rentPrice,
+                stock: stock,
+                image: req.file ? req.file.path : null,
+                category_id: categoryId,
+            },
+            select: {
+                uuid: true,
+                title: true,
+                description: true,
+                sell_price: true,
+                rent_price: true,
+                stock: true,
+                image: true,
+                created_at: true,
+                updated_at: true,
+                category: { select: { uuid: true, name: true } },
+            }
+        });
+
+        res.status(201).send({
+            meta: { success: true, message: "Produk berhasil dibuat" },
+            data: product,
+        });
+    } catch (error) {
+        console.error("Error creating product:", error);
+        res.status(500).send({
+            meta: { success: false, message: "Kesalahan server saat membuat produk" },
+            errors: [{ msg: error.message, path: "general" }],
+        });
+    }
+};
+
+
+// Ambil produk by UUID
+const findProductById = async (req, res) => {
+    const { uuid } = req.params;
+    try {
+        const product = await prisma.product.findUnique({
+            where: { uuid },
+            select: {
+                uuid: true,
+                title: true,
+                description: true,
+                sell_price: true,
+                rent_price: true,
+                stock: true,
+                image: true,
+                created_at: true,
+                updated_at: true,
+                category: {
+                    select: { id: true, name: true },
+                },
+            },
+        });
+
+        if (!product) {
+            return res.status(404).send({
+                meta: { success: false, message: `Produk dengan UUID ${uuid} tidak ditemukan` },
+            });
+        }
+
+        res.status(200).send({
+            meta: { success: true, message: "Berhasil mengambil produk" },
+            data: product,
+        });
+    } catch (error) {
+        res.status(500).send({
+            meta: { success: false, message: "Kesalahan internal server" },
+            errors: error.message,
+        });
+    }
+};
+
+// Update produk by UUID
+const updateProduct = async (req, res) => {
+    const { uuid } = req.params;
+
+    try {
+        const existing = await prisma.product.findUnique({ where: { uuid } });
+        if (!existing) {
+            return res.status(404).send({
+                meta: { success: false, message: `Produk dengan UUID ${uuid} tidak ditemukan` },
+            });
+        }
+
+        let dataProduct = {
+            title: req.body.title,
+            description: req.body.description || null,
+            sell_price: parseFloat(req.body.sell_price),
+            rent_price: req.body.rent_price ? parseFloat(req.body.rent_price) : null,
+            stock: parseInt(req.body.stock),
+            category_id: parseInt(req.body.category_id),
+        };
+
+        if (req.file) {
+            dataProduct.image = req.file.path;
+
+            if (existing.image && fs.existsSync(existing.image)) {
+                fs.unlinkSync(existing.image);
+            }
+        }
+
+        const product = await prisma.product.update({
+            where: { uuid },
+            data: dataProduct,
+            select: {
+                uuid: true,
+                title: true,
+                description: true,
+                sell_price: true,
+                rent_price: true,
+                stock: true,
+                image: true,
+                created_at: true,
+                updated_at: true,
+                category: { select: { id: true, name: true } },
+            }
+        });
+
+        res.status(200).send({
+            meta: { success: true, message: "Produk berhasil diperbarui" },
+            data: product,
+        });
+    } catch (error) {
+        res.status(500).send({
+            meta: { success: false, message: "Kesalahan internal server" },
+            errors: error.message,
+        });
+    }
+};
+
+// Hapus produk by UUID
+const deleteProduct = async (req, res) => {
+    const { uuid } = req.params;
+
+    try {
+        const product = await prisma.product.findUnique({ where: { uuid } });
+
+        if (!product) {
+            return res.status(404).send({
+                meta: { success: false, message: `Produk dengan UUID ${uuid} tidak ditemukan` },
+            });
+        }
+
+        await prisma.product.delete({ where: { uuid } });
+
+        if (product.image && fs.existsSync(product.image)) {
+            fs.unlinkSync(product.image);
+        }
+
+        res.status(200).send({
+            meta: { success: true, message: "Produk berhasil dihapus" },
+        });
+    } catch (error) {
+        res.status(500).send({
+            meta: { success: false, message: "Kesalahan internal server" },
+            errors: error.message,
+        });
+    }
+};
+
+// Produk by kategori
+const findProductByCategoryId = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 5;
+        const skip = (page - 1) * limit;
+
+        const products = await prisma.product.findMany({
+            where: { category_id: Number(id) },
+            select: {
+                uuid: true,
+                title: true,
+                description: true,
+                sell_price: true,
+                rent_price: true,
+                stock: true,
+                image: true,
+            },
+            orderBy: { id: "desc" },
+            skip,
+            take: limit,
+        });
+
+        const total = await prisma.product.count({
+            where: { category_id: Number(id) },
+        });
+
+        res.status(200).send({
+            meta: { success: true, message: "Berhasil mengambil produk berdasarkan kategori" },
+            data: products,
+            pagination: {
+                currentPage: page,
+                totalPages: Math.ceil(total / limit),
+                perPage: limit,
+                total,
+            },
+        });
+    } catch (error) {
+        res.status(500).send({
+            meta: { success: false, message: "Kesalahan internal server" },
+            errors: error.message,
+        });
+    }
+};
+
+// Semua produk (dropdown)
+const allProducts = async (req, res) => {
+    try {
+        const products = await prisma.product.findMany({
+            select: {
+                id: true,
+                uuid: true,
+                title: true,
+                sell_price: true,
+                rent_price: true,
+                image: true,
+                stock: true,
+                category: { select: { id: true, name: true } },
+            },
+            orderBy: { id: "desc" },
+        });
+
+        res.status(200).send({
+            meta: { success: true, message: "Berhasil mengambil semua produk" },
+            data: products,
+        });
+    } catch (error) {
+        res.status(500).send({
+            meta: { success: false, message: "Kesalahan internal server" },
+            errors: error.message,
+        });
+    }
 };
 
 module.exports = {
@@ -285,5 +329,5 @@ module.exports = {
     updateProduct,
     deleteProduct,
     findProductByCategoryId,
-    allProducts
+    allProducts,
 };

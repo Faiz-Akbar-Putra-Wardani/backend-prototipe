@@ -4,7 +4,7 @@ const validateRepair = [
   // Customer ID - wajib
   body("customer_id")
     .notEmpty().withMessage("Customer wajib dipilih")
-    .isInt({ gt: 0 }).withMessage("Customer ID harus berupa angka valid"),
+    .isUUID().withMessage("Customer ID harus berupa UUID valid"),
 
   // Item Repair - wajib (ganti dari custom_item)
   body("item_repair")
