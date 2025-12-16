@@ -1,28 +1,43 @@
-const express = require("express");
+
 const prisma = require("../prisma/client");
 const fs = require("fs");
 
-// Ambil semua projects (pagination + search)
 const findProjects = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 5;
         const skip = (page - 1) * limit;
         const search = req.query.search || '';
+        const categoryId = req.query.category_id; 
+
+        let whereCondition = {
+            project_name: {
+                contains: search,
+            },
+        };
+
+        // Filter by category jika ada
+        if (categoryId) {
+            whereCondition.project_category_id = parseInt(categoryId);
+        }
 
         const projects = await prisma.project.findMany({
-            where: {
-                project_name: {
-                    contains: search, 
-                },
-            },
+            where: whereCondition,
             select: {
-                uuid: true,  
+                uuid: true,
                 project_name: true,
                 location: true,
                 image: true,
                 created_at: true,
                 updated_at: true,
+                category: {
+                    select: {
+                        id: true,
+                        uuid: true,
+                        name: true,
+                        slug: true,
+                    }
+                }
             },
             orderBy: {
                 id: "desc",
@@ -32,11 +47,7 @@ const findProjects = async (req, res) => {
         });
 
         const totalProjects = await prisma.project.count({
-            where: {
-                project_name: {
-                    contains: search, 
-                },
-            },
+            where: whereCondition,
         });
 
         const totalPages = Math.ceil(totalProjects / limit);
@@ -66,7 +77,6 @@ const findProjects = async (req, res) => {
     }
 };
 
-// Buat project baru
 const createproject = async (req, res) => {
     try {
         // Validasi file image
@@ -78,19 +88,50 @@ const createproject = async (req, res) => {
             });
         }
 
+        // Validasi category_id
+        const categoryId = parseInt(req.body.project_category_id);
+        
+        if (isNaN(categoryId)) {
+            return res.status(422).send({
+                success: false,
+                message: "Category ID tidak valid",
+                errors: [{ msg: "Category ID harus berupa angka", path: "project_category_id" }],
+            });
+        }
+
+        const categoryExists = await prisma.projectCategory.findUnique({
+            where: { id: categoryId }
+        });
+
+        if (!categoryExists) {
+            return res.status(404).send({
+                success: false,
+                message: "Kategori proyek tidak ditemukan",
+                errors: [{ msg: "Category ID tidak valid", path: "project_category_id" }],
+            });
+        }
+
         const project = await prisma.project.create({
             data: {
                 project_name: req.body.project_name,
                 location: req.body.location,
+                project_category_id: categoryId,
                 image: req.file.path,
             },
             select: {
-                uuid: true,  
+                uuid: true,
                 project_name: true,
                 location: true,
                 image: true,
                 created_at: true,
                 updated_at: true,
+                category: {
+                    select: {
+                        uuid: true,
+                        name: true,
+                        slug: true,
+                    }
+                }
             }
         });
 
@@ -113,24 +154,27 @@ const createproject = async (req, res) => {
     }
 };
 
-// Ambil project by UUID
 const findprojectById = async (req, res) => {
-    const { uuid } = req.params;  
+    const { uuid } = req.params;
 
     try {
-        console.log("Fetching project with UUID:", uuid);
-
         const project = await prisma.project.findUnique({
-            where: {
-                uuid: uuid,  
-            },
+            where: { uuid },
             select: {
-                uuid: true,  
+                uuid: true,
                 project_name: true,
                 location: true,
                 image: true,
                 created_at: true,
                 updated_at: true,
+                category: {
+                    select: {
+                        id: true,
+                        uuid: true,
+                        name: true,
+                        slug: true,
+                    }
+                }
             },
         });
 
@@ -162,18 +206,13 @@ const findprojectById = async (req, res) => {
     }
 };
 
-// Update project by UUID
 const updateproject = async (req, res) => {
-    const { uuid } = req.params;  
+    const { uuid } = req.params;
 
     try {
-        console.log("Updating project with UUID:", uuid);
-
         // Cek apakah project ada
         const existingProject = await prisma.project.findUnique({
-            where: {
-                uuid: uuid,  
-            },
+            where: { uuid },
         });
 
         if (!existingProject) {
@@ -186,9 +225,36 @@ const updateproject = async (req, res) => {
         }
 
         const dataProject = {
-            project_name: req.body.project_name, 
+            project_name: req.body.project_name,
             location: req.body.location,
         };
+
+        // Update category jika ada
+        if (req.body.project_category_id) {
+            const categoryId = parseInt(req.body.project_category_id);
+            
+            if (isNaN(categoryId)) {
+                return res.status(422).send({
+                    success: false,
+                    message: "Category ID tidak valid",
+                    errors: [{ msg: "Category ID harus berupa angka", path: "project_category_id" }],
+                });
+            }
+
+            const categoryExists = await prisma.projectCategory.findUnique({
+                where: { id: categoryId }
+            });
+
+            if (!categoryExists) {
+                return res.status(404).send({
+                    success: false,
+                    message: "Kategori proyek tidak ditemukan",
+                    errors: [{ msg: "Category ID tidak valid", path: "project_category_id" }],
+                });
+            }
+
+            dataProject.project_category_id = categoryId;
+        }
 
         // Handle image upload
         if (req.file) {
@@ -201,17 +267,22 @@ const updateproject = async (req, res) => {
         }
 
         const project = await prisma.project.update({
-            where: {
-                uuid: uuid,  
-            },
+            where: { uuid },
             data: dataProject,
             select: {
-                uuid: true,  
+                uuid: true,
                 project_name: true,
                 location: true,
                 image: true,
                 created_at: true,
                 updated_at: true,
+                category: {
+                    select: {
+                        uuid: true,
+                        name: true,
+                        slug: true,
+                    }
+                }
             }
         });
 
@@ -234,17 +305,12 @@ const updateproject = async (req, res) => {
     }
 };
 
-// Hapus project by UUID
 const deleteProject = async (req, res) => {
-    const { uuid } = req.params;  
+    const { uuid } = req.params;
 
     try {
-        console.log("Deleting project with UUID:", uuid);
-
         const project = await prisma.project.findUnique({
-            where: {
-                uuid: uuid,  
-            },
+            where: { uuid },
         });
 
         if (!project) {
@@ -257,9 +323,7 @@ const deleteProject = async (req, res) => {
         }
 
         await prisma.project.delete({
-            where: {
-                uuid: uuid,  
-            },
+            where: { uuid },
         });
 
         if (project.image && fs.existsSync(project.image)) {
@@ -284,22 +348,46 @@ const deleteProject = async (req, res) => {
     }
 };
 
-// Ambil semua projects (tanpa pagination)
-// Di ProyekController.js
 const publicProjects = async (req, res) => {
     try {
-        const limit = parseInt(req.query.limit) || 10; // Batasi max 10 untuk performa
-        
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 12;
+        const skip = (page - 1) * limit;
+        const categorySlug = req.query.category; 
+
+        let whereCondition = {};
+
+        // Filter by category slug jika ada
+        if (categorySlug) {
+            whereCondition.category = {
+                slug: categorySlug
+            };
+        }
+
         const projects = await prisma.project.findMany({
-            select: {  
+            where: whereCondition,
+            select: {
+                uuid: true,
                 project_name: true,
                 location: true,
                 image: true,
+                created_at: true,
+                category: {
+                    select: {
+                        name: true,
+                        slug: true,
+                    }
+                }
             },
             orderBy: {
-                created_at: "desc", 
+                created_at: "desc",
             },
+            skip,
             take: limit,
+        });
+
+        const total = await prisma.project.count({
+            where: whereCondition,
         });
 
         res.status(200).send({
@@ -308,6 +396,12 @@ const publicProjects = async (req, res) => {
                 message: "Berhasil mendapatkan proyek publik",
             },
             data: projects,
+            pagination: {
+                currentPage: page,
+                totalPages: Math.ceil(total / limit),
+                perPage: limit,
+                total,
+            },
         });
     } catch (error) {
         console.error("Error in publicProjects:", error);
@@ -320,7 +414,6 @@ const publicProjects = async (req, res) => {
         });
     }
 };
-
 
 module.exports = {
     findProjects,

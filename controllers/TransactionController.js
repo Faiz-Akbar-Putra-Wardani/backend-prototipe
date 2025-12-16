@@ -390,10 +390,10 @@ const getTransactions = async (req, res) => {
     const where = search
       ? {
           OR: [
-            { invoice: { contains: search, mode: "insensitive" } },
+            { invoice: { contains: search } },
             {
               customer: {
-                name_perusahaan: { contains: search, mode: "insensitive" }
+                name_perusahaan: { contains: search }
               }
             }
           ]

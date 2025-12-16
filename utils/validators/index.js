@@ -11,6 +11,7 @@ const { validateClient } = require("./klien");
 const { validateRepair } = require("./repair");
 const { validateBank } = require("./bank");
 const { validateCreateAdmin, validateUpdateAdmin } = require("./admin");
+const { validateProjectCategory } = require("./category-projects");
 
 
 module.exports = { 
@@ -29,4 +30,5 @@ module.exports = {
     validateBank,
     validateCreateAdmin,
     validateUpdateAdmin,
+    validateProjectCategory
  };

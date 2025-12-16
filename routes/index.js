@@ -2,7 +2,7 @@ const express = require('express');
 
 const router = express.Router();
 
-const { validateLogin, validateCustomer, validateCategory, validateProduct, validateDetailProduct, validateCart, validateUpdateCartQty, validateTransaction, validateRental, validateProject, validateClient, validateRepair, validateBank, validateCreateAdmin, validateUpdateAdmin } = require('../utils/validators');
+const { validateLogin, validateCustomer, validateCategory, validateProduct, validateDetailProduct, validateCart, validateUpdateCartQty, validateTransaction, validateRental, validateProject, validateClient, validateRepair, validateBank, validateCreateAdmin, validateUpdateAdmin, validateProjectCategory } = require('../utils/validators');
 const { handleValidationErrors, verifyToken, upload} = require('../middlewares');
 
 const loginController = require('../controllers/LoginController');
@@ -20,16 +20,66 @@ const reportController = require('../controllers/reportController');
 const profitController = require('../controllers/ProfitController');
 const bankController = require('../controllers/BankController');
 const adminController = require('../controllers/adminController');
+const projectCategoryController = require('../controllers/projectCategoryController');
 
 const routes = [
+ 
+  // PUBLIC ROUTES
   // Login 
-  { method: 'post', 
+  { 
+    method: 'post', 
     path: '/login', 
     middlewares: [validateLogin, handleValidationErrors], 
     handler: loginController.login 
   },
 
-   // Admin Routes
+  // Public Categories (Product)
+  {
+    method: 'get',
+    path: '/public/categories',
+    middlewares: [],
+    handler: categoryController.publicCategories
+  },
+
+  // Public Products
+  {
+    method: 'get',
+    path: '/public/products',
+    middlewares: [],
+    handler: productController.publicProducts
+  },
+  {
+    method: 'get',
+    path: '/public/products/:uuid',
+    middlewares: [],
+    handler: productController.publicProductDetail
+  },
+
+  {
+    method: 'get',
+    path: '/public/project-categories',
+    middlewares: [],
+    handler: projectCategoryController.publicProjectCategories
+  },
+
+  // Public Projects
+  {
+    method: 'get',
+    path: '/public/projects',
+    middlewares: [], 
+    handler: projectController.publicProjects
+  },
+
+  // Public Clients
+  {
+    method: 'get',
+    path: '/public/clients',
+    middlewares: [], 
+    handler: clientController.publicClients
+  },
+
+  // PROTECTED ROUTES (Admin)
+  // Admin Routes
   { 
     method: 'get', 
     path: '/admins', 
@@ -67,296 +117,329 @@ const routes = [
     handler: adminController.allAdmins 
   },
 
-  //customers
-  { method: 'get', 
+  // Customers
+  { 
+    method: 'get', 
     path: '/customers', 
     middlewares: [verifyToken], 
     handler: customerController.findCustomers 
   },
-  { method: 'post', 
+  { 
+    method: 'post', 
     path: '/customers', 
     middlewares: [verifyToken, validateCustomer, handleValidationErrors], 
     handler: customerController.createCustomers 
   },
-  { method: 'get', 
+  { 
+    method: 'get', 
     path: '/customers/:uuid', 
     middlewares: [verifyToken], 
     handler: customerController.findCustomerById 
   },
-  { method: 'put', 
+  { 
+    method: 'put', 
     path: '/customers/:uuid', 
     middlewares: [verifyToken, validateCustomer, handleValidationErrors], 
     handler: customerController.updateCustomer 
   },
-  { method: 'delete', 
+  { 
+    method: 'delete', 
     path: '/customers/:uuid', 
     middlewares: [verifyToken], 
     handler: customerController.deleteCustomer 
   },
-  { method: 'get', 
+  { 
+    method: 'get', 
     path: '/customers-all', 
     middlewares: [verifyToken], 
     handler: customerController.allCustomers 
   },
 
-  {
-    method: 'get',
-    path: '/public/categories',
-    middlewares: [],
-    handler: categoryController.publicCategories
-  },
-
-  // Category 
-  { method: 'get', 
+  // Category (Product)
+  { 
+    method: 'get', 
     path: '/categories',
     middlewares: [verifyToken], 
     handler: categoryController.findCategories 
   },
-  { method: 'post', 
+  { 
+    method: 'post', 
     path: '/categories', 
     middlewares: [verifyToken, upload.single('image'), validateCategory, handleValidationErrors], 
     handler: categoryController.createCategory 
   },
-  { method: 'get', 
+  { 
+    method: 'get', 
     path: '/categories/:uuid', 
     middlewares: [verifyToken], 
     handler: categoryController.findCategoryById 
   },
-  { method: 'put', 
+  { 
+    method: 'put', 
     path: '/categories/:uuid', 
     middlewares: [verifyToken, upload.single('image'), validateCategory, handleValidationErrors],
     handler: categoryController.updateCategory 
   },
-  { method: 'delete', 
+  { 
+    method: 'delete', 
     path: '/categories/:uuid', 
     middlewares: [verifyToken], 
     handler: categoryController.deleteCategory 
   },
-  { method: 'get', 
+  { 
+    method: 'get', 
     path: '/categories-all', 
     middlewares: [verifyToken], 
     handler: categoryController.allCategories 
   },
 
-  {
-    method: 'get',
-    path: '/public/products',
-    middlewares: [],
-    handler: productController.publicProducts
-  },
-
-  {
-    method: 'get',
-    path: '/public/products/:uuid',
-    middlewares: [],
-    handler: productController.publicProductDetail
-  },
-
   // Product routes
-  { method: 'get', 
-    path: '/products', middlewares: [verifyToken], 
+  { 
+    method: 'get', 
+    path: '/products', 
+    middlewares: [verifyToken], 
     handler: productController.findProducts 
   },
-  { method: 'post', 
+  { 
+    method: 'post', 
     path: '/products', 
-    middlewares: [verifyToken, upload.single('image'), validateProduct, 
-    handleValidationErrors], handler: productController.createProduct
-   },
-  { method: 'get', 
+    middlewares: [verifyToken, upload.single('image'), validateProduct, handleValidationErrors], 
+    handler: productController.createProduct
+  },
+  { 
+    method: 'get', 
     path: '/products/:uuid', 
     middlewares: [verifyToken], 
     handler: productController.findProductById 
   },
-  { method: 'put', 
+  { 
+    method: 'put', 
     path: '/products/:uuid', 
     middlewares: [verifyToken, upload.single('image'), validateProduct, handleValidationErrors], 
     handler: productController.updateProduct 
   },
-  { method: 'delete', 
+  { 
+    method: 'delete', 
     path: '/products/:uuid', 
     middlewares: [verifyToken], 
     handler: productController.deleteProduct 
   },
-  { method: 'get', 
+  { 
+    method: 'get', 
     path: '/products-by-category/:id', 
     middlewares: [verifyToken], 
     handler: productController.findProductByCategoryId 
   },
-  { method: 'get', 
+  { 
+    method: 'get', 
     path: '/products-all', 
     middlewares: [verifyToken], 
     handler: productController.allProducts 
   }, 
 
   // Detail Product
-  { method: 'get', 
+  { 
+    method: 'get', 
     path: '/detail-products', 
     middlewares: [verifyToken], 
     handler: detailProductController.findDetailProducts 
   },
-  { method: 'get', 
+  { 
+    method: 'get', 
     path: '/detail-products/:uuid', 
     middlewares: [verifyToken], 
     handler: detailProductController.findDetailProductById 
   },
-  { method: 'post', 
+  { 
+    method: 'post', 
     path: '/detail-products', 
     middlewares: [verifyToken, validateDetailProduct, handleValidationErrors], 
     handler: detailProductController.createDetailProduct 
   },
-  { method: 'put', 
+  { 
+    method: 'put', 
     path: '/detail-products/:uuid', 
     middlewares: [verifyToken, validateDetailProduct, handleValidationErrors], 
     handler: detailProductController.updateDetailProduct 
   },
-  { method: 'delete', 
+  { 
+    method: 'delete', 
     path: '/detail-products/:uuid', 
     middlewares: [verifyToken], 
     handler: detailProductController.deleteDetailProduct 
   },
-  { method: 'get', 
+  { 
+    method: 'get', 
     path: '/detail-products-by-category/:categoryId', 
     middlewares: [verifyToken], 
     handler: detailProductController.findProductsByCategory 
   },
 
-   // Cart routes
-  { method: 'get', 
+  // Cart routes
+  { 
+    method: 'get', 
     path: '/carts',
-     middlewares: [verifyToken], 
-     handler: cartController.findCarts 
+    middlewares: [verifyToken], 
+    handler: cartController.findCarts 
   },
-  { method: 'post', 
+  { 
+    method: 'post', 
     path: '/carts', 
     middlewares: [verifyToken, validateCart, handleValidationErrors], 
     handler: cartController.createCart 
   },
-   { method: 'put', 
+  { 
+    method: 'put', 
     path: '/carts/:id', 
     middlewares: [verifyToken, validateUpdateCartQty, handleValidationErrors], 
     handler: cartController.updateCart 
   },
-  { method: 'delete', 
+  { 
+    method: 'delete', 
     path: '/carts/:id', 
     middlewares: [verifyToken], 
     handler: cartController.deleteCart 
   },
 
- 
-// 1. Routes dengan path SPESIFIK dulu
-{ 
-  method: 'get',
-  path: '/transactions/invoice/new',
-  middlewares: [verifyToken], 
-  handler: transactionController.getNewInvoice 
-},
-
-{
-  method: 'get',
-  path: '/transactions/invoice/:invoice',
-  middlewares: [verifyToken],
-  handler: transactionController.getTransactionByInvoice
-},
-
-// 2. CRUD dengan :uuid parameter
-{ 
-  method: 'post', 
-  path: '/transactions', 
-  middlewares: [verifyToken, validateTransaction, handleValidationErrors], 
-  handler: transactionController.createTransaction 
-},
-
-{ 
-  method: 'get',
-  path: '/transactions',
-  middlewares: [verifyToken],
-  handler: transactionController.getTransactions 
-},
-
-{ 
-  method: 'get',
-  path: '/transactions/:uuid',  
-  middlewares: [verifyToken], 
-  handler: transactionController.getTransactionById 
-},
-
-{ 
-  method: 'put', 
-  path: '/transactions/:uuid', 
-  middlewares: [verifyToken, validateTransaction, handleValidationErrors], 
-  handler: transactionController.updateTransaction 
-},
-
-{ 
-  method: 'patch', 
-  path: '/transactions/:uuid/status',  
-  middlewares: [verifyToken], 
-  handler: transactionController.updateStatus 
-},
-
-{ 
-  method: "delete", 
-  path: "/transactions/:uuid", 
-  middlewares: [verifyToken], 
-  handler: transactionController.deleteTransaction 
-},
-
-{
-  method: 'post',
-  path: '/rentals',
-  middlewares: [verifyToken, validateRental, handleValidationErrors],
-  handler: rentalController.createRental
-},
-{
-  method: 'get',
-  path: '/rentals',
-  middlewares: [verifyToken],
-  handler: rentalController.getRentals
-},
-{
-  method: 'get',
-  path: '/rentals/invoice/new',  
-  middlewares: [verifyToken],
-  handler: rentalController.getNewInvoice
-},
-{
-  method: 'get',
-  path: '/rentals/invoice/:invoice',  
-  middlewares: [verifyToken],
-  handler: rentalController.getRentalByInvoice
-},
-{
-  method: 'get',
-  path: '/rentals/:uuid',  
-  middlewares: [verifyToken],
-  handler: rentalController.getRentalById
-},
-{
-  method: 'patch',
-  path: '/rentals/:uuid/status',
-  middlewares: [verifyToken],
-  handler: rentalController.updateRentalStatus
-},
-{
-  method: 'put',
-  path: '/rentals/:uuid',
-  middlewares: [verifyToken, validateRental, handleValidationErrors],
-  handler: rentalController.updateRental
-},
-{
-  method: 'delete',
-  path: '/rentals/:uuid',
-  middlewares: [verifyToken],
-  handler: rentalController.deleteRental
-},
-
-    // Project Routes
+  // Transactions
+  { 
+    method: 'get',
+    path: '/transactions/invoice/new',
+    middlewares: [verifyToken], 
+    handler: transactionController.getNewInvoice 
+  },
   {
     method: 'get',
-    path: '/public/projects',
-    middlewares: [], 
-    handler: projectController.publicProjects
+    path: '/transactions/invoice/:invoice',
+    middlewares: [verifyToken],
+    handler: transactionController.getTransactionByInvoice
   },
+  { 
+    method: 'post', 
+    path: '/transactions', 
+    middlewares: [verifyToken, validateTransaction, handleValidationErrors], 
+    handler: transactionController.createTransaction 
+  },
+  { 
+    method: 'get',
+    path: '/transactions',
+    middlewares: [verifyToken],
+    handler: transactionController.getTransactions 
+  },
+  { 
+    method: 'get',
+    path: '/transactions/:uuid',  
+    middlewares: [verifyToken], 
+    handler: transactionController.getTransactionById 
+  },
+  { 
+    method: 'put', 
+    path: '/transactions/:uuid', 
+    middlewares: [verifyToken, validateTransaction, handleValidationErrors], 
+    handler: transactionController.updateTransaction 
+  },
+  { 
+    method: 'patch', 
+    path: '/transactions/:uuid/status',  
+    middlewares: [verifyToken], 
+    handler: transactionController.updateStatus 
+  },
+  { 
+    method: "delete", 
+    path: "/transactions/:uuid", 
+    middlewares: [verifyToken], 
+    handler: transactionController.deleteTransaction 
+  },
+
+  // Rentals
+  {
+    method: 'post',
+    path: '/rentals',
+    middlewares: [verifyToken, validateRental, handleValidationErrors],
+    handler: rentalController.createRental
+  },
+  {
+    method: 'get',
+    path: '/rentals',
+    middlewares: [verifyToken],
+    handler: rentalController.getRentals
+  },
+  {
+    method: 'get',
+    path: '/rentals/invoice/new',  
+    middlewares: [verifyToken],
+    handler: rentalController.getNewInvoice
+  },
+  {
+    method: 'get',
+    path: '/rentals/invoice/:invoice',  
+    middlewares: [verifyToken],
+    handler: rentalController.getRentalByInvoice
+  },
+  {
+    method: 'get',
+    path: '/rentals/:uuid',  
+    middlewares: [verifyToken],
+    handler: rentalController.getRentalById
+  },
+  {
+    method: 'patch',
+    path: '/rentals/:uuid/status',
+    middlewares: [verifyToken],
+    handler: rentalController.updateRentalStatus
+  },
+  {
+    method: 'put',
+    path: '/rentals/:uuid',
+    middlewares: [verifyToken, validateRental, handleValidationErrors],
+    handler: rentalController.updateRental
+  },
+  {
+    method: 'delete',
+    path: '/rentals/:uuid',
+    middlewares: [verifyToken],
+    handler: rentalController.deleteRental
+  },
+
+  // project categories
+  {
+    method: 'get',
+    path: '/project-categories',
+    middlewares: [verifyToken],
+    handler: projectCategoryController.findProjectCategories
+  },
+  {
+    method: 'post',
+    path: '/project-categories',
+    middlewares: [verifyToken, validateProjectCategory, handleValidationErrors],
+    handler: projectCategoryController.createProjectCategory
+  },
+  {
+    method: 'get',
+    path: '/project-categories/:uuid',
+    middlewares: [verifyToken],
+    handler: projectCategoryController.findProjectCategoryById
+  },
+  {
+    method: 'put',
+    path: '/project-categories/:uuid',
+    middlewares: [verifyToken, validateProjectCategory, handleValidationErrors],
+    handler: projectCategoryController.updateProjectCategory
+  },
+  {
+    method: 'delete',
+    path: '/project-categories/:uuid',
+    middlewares: [verifyToken],
+    handler: projectCategoryController.deleteProjectCategory
+  },
+  {
+    method: 'get',
+    path: '/project-categories-all',
+    middlewares: [verifyToken],
+    handler: projectCategoryController.allProjectCategories
+  },
+
+  // projects
   {
     method: 'get',
     path: '/projects',
@@ -398,14 +481,7 @@ const routes = [
     handler: projectController.deleteProject
   },
 
-
-    // Client Routes
-    {
-    method: 'get',
-    path: '/public/clients',
-    middlewares: [], 
-    handler: clientController.publicClients
-  },
+  // Client Routes
   {
     method: 'get',
     path: '/clients',
@@ -459,41 +535,36 @@ const routes = [
     ],
     handler: repairController.createRepair
   },
-  // Get All Repairs (with pagination + search)
   {
     method: 'get',
     path: '/repairs',
     middlewares: [verifyToken],
     handler: repairController.getRepairs
   },
-  // Get New Invoice
   {
     method: 'get',
     path: '/repairs/invoice/new',
     middlewares: [verifyToken],
     handler: repairController.getNewRepairInvoice
   },
-  // Get Repair By Invoice
   {
     method: 'get',
     path: '/repairs/invoice/:invoice',
     middlewares: [verifyToken],
     handler: repairController.getRepairByInvoice
   },
-  // Get Repair By ID
   {
     method: 'get',
     path: '/repairs/:uuid',
     middlewares: [verifyToken],
     handler: repairController.getRepairById
   },
-  // Update Repair - TAMBAHKAN upload.single('image')
   {
-  method: 'patch',
-  path: '/repairs/:uuid/status',
-  middlewares: [verifyToken],
-  handler: repairController.updateRepairStatus
-},
+    method: 'patch',
+    path: '/repairs/:uuid/status',
+    middlewares: [verifyToken],
+    handler: repairController.updateRepairStatus
+  },
   {
     method: 'put',
     path: '/repairs/:uuid',
@@ -505,7 +576,6 @@ const routes = [
     ],
     handler: repairController.updateRepair
   },
-  // Delete Repair
   {
     method: 'delete',
     path: '/repairs/:uuid',
@@ -513,6 +583,7 @@ const routes = [
     handler: repairController.deleteRepair
   },
 
+  // Reports
   {
     method: 'get',
     path: '/reports/customer-recap',
@@ -525,14 +596,15 @@ const routes = [
     middlewares: [verifyToken],
     handler: reportController.getTransactionStats
   },
-
   {
-  method: "delete",
-  path: "/reports/:id",
-  middlewares: [verifyToken],
-  handler: reportController.deleteCustomerRecap,
-},
-{
+    method: "delete",
+    path: "/reports/:id",
+    middlewares: [verifyToken],
+    handler: reportController.deleteCustomerRecap,
+  },
+
+  // Profits
+  {
     method: 'get',
     path: '/profits/total-revenue',
     middlewares: [verifyToken],
@@ -562,14 +634,14 @@ const routes = [
     middlewares: [verifyToken],
     handler: profitController.getMonthlyRevenueBySource
   },
-    {
+  {
     method: 'get',
     path: '/profits/recent-transactions',
     middlewares: [verifyToken],
     handler: profitController.getRecentTransactions
   },
 
-   // Bank Routes
+  // Bank Routes
   {
     method: 'get',
     path: '/banks',
@@ -606,7 +678,6 @@ const routes = [
     middlewares: [verifyToken],
     handler: bankController.allBanks
   },
-
 ];
 
 const createRoutes = (routes) => {

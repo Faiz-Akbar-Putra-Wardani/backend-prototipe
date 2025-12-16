@@ -232,15 +232,31 @@ model Profit {
 }
 
 model Project {
-  id           Int       @id @default(autoincrement())
-  uuid         String    @unique @default(uuid())
-  image        String
-  project_name String
-  location     String
-  created_at   DateTime  @default(now())
-  updated_at   DateTime  @updatedAt
+  id                 Int            @id @default(autoincrement())
+  uuid               String         @unique @default(uuid())
+  image              String
+  project_name       String
+  location           String
+  project_category_id Int           
+  created_at         DateTime       @default(now())
+  updated_at         DateTime       @updatedAt
+  
+  category           ProjectCategory @relation(fields: [project_category_id], references: [id], onDelete: Restrict)
 
   @@map("projects")
+}
+
+model ProjectCategory {
+  id          Int       @id @default(autoincrement())
+  uuid        String    @unique @default(uuid())
+  name        String    @unique 
+  slug        String    @unique   
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  
+  projects    Project[]
+
+  @@map("project_categories")
 }
 
 model Partnership {

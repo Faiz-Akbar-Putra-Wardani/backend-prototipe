@@ -183,11 +183,11 @@ const getRepairs = async (req, res) => {
     const where = search
       ? {
           OR: [
-            { invoice: { contains: search, mode: "insensitive" } },
-            { item_repair: { contains: search, mode: "insensitive" } },
+            { invoice: { contains: search } },
+            { item_repair: { contains: search } },
             {
               customer: {
-                name_perusahaan: { contains: search, mode: "insensitive" }
+                name_perusahaan: { contains: search }
               }
             }
           ]
