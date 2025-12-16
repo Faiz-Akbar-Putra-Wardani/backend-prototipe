@@ -99,6 +99,13 @@ const routes = [
     handler: customerController.allCustomers 
   },
 
+  {
+    method: 'get',
+    path: '/public/categories',
+    middlewares: [],
+    handler: categoryController.publicCategories
+  },
+
   // Category 
   { method: 'get', 
     path: '/categories',
@@ -129,6 +136,20 @@ const routes = [
     path: '/categories-all', 
     middlewares: [verifyToken], 
     handler: categoryController.allCategories 
+  },
+
+  {
+    method: 'get',
+    path: '/public/products',
+    middlewares: [],
+    handler: productController.publicProducts
+  },
+
+  {
+    method: 'get',
+    path: '/public/products/:uuid',
+    middlewares: [],
+    handler: productController.publicProductDetail
   },
 
   // Product routes
@@ -332,6 +353,12 @@ const routes = [
     // Project Routes
   {
     method: 'get',
+    path: '/public/projects',
+    middlewares: [], 
+    handler: projectController.publicProjects
+  },
+  {
+    method: 'get',
     path: '/projects',
     middlewares: [verifyToken],
     handler: projectController.findProjects
@@ -370,14 +397,15 @@ const routes = [
     middlewares: [verifyToken],
     handler: projectController.deleteProject
   },
-  {
-    method: 'get',
-    path: '/projects-all',
-    middlewares: [verifyToken],
-    handler: projectController.allProjects
-  },
+
 
     // Client Routes
+    {
+    method: 'get',
+    path: '/public/clients',
+    middlewares: [], 
+    handler: clientController.publicClients
+  },
   {
     method: 'get',
     path: '/clients',
@@ -418,13 +446,7 @@ const routes = [
     middlewares: [verifyToken],
     handler: clientController.deleteClient
   },
-  {
-    method: 'get',
-    path: '/clients-all',
-    middlewares: [verifyToken],
-    handler: clientController.allClients
-  },
-
+  
   // REPAIR
   {
     method: 'post',

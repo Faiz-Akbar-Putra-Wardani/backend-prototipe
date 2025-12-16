@@ -285,31 +285,32 @@ const deleteProject = async (req, res) => {
 };
 
 // Ambil semua projects (tanpa pagination)
-const allProjects = async (req, res) => {
+// Di ProyekController.js
+const publicProjects = async (req, res) => {
     try {
+        const limit = parseInt(req.query.limit) || 10; // Batasi max 10 untuk performa
+        
         const projects = await prisma.project.findMany({
-            select: {
-                uuid: true,  
+            select: {  
                 project_name: true,
                 location: true,
                 image: true,
-                created_at: true,
-                updated_at: true,
             },
             orderBy: {
-                id: "desc",
-            }
+                created_at: "desc", 
+            },
+            take: limit,
         });
 
         res.status(200).send({
             meta: {
                 success: true,
-                message: "Berhasil mendapatkan semua proyek",
+                message: "Berhasil mendapatkan proyek publik",
             },
             data: projects,
         });
     } catch (error) {
-        console.error("Error in allProjects:", error);
+        console.error("Error in publicProjects:", error);
         res.status(500).send({
             meta: {
                 success: false,
@@ -320,11 +321,12 @@ const allProjects = async (req, res) => {
     }
 };
 
+
 module.exports = {
     findProjects,
     createproject,
     findprojectById,
     updateproject,
     deleteProject,
-    allProjects
+    publicProjects
 };

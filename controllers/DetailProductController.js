@@ -409,6 +409,7 @@ const findProductsByCategory = async (req, res) => {
   }
 };
 
+
 module.exports = {
   findDetailProducts,
   findDetailProductById,

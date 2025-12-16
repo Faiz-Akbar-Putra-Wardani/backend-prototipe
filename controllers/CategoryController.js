@@ -204,6 +204,37 @@ const allCategories = async (req, res) => {
     }
 };
 
+const publicCategories = async (req, res) => {
+    try {
+        const categories = await prisma.category.findMany({
+            select: {
+                uuid: true,  
+                name: true,
+                image: true,
+            },
+            orderBy: {
+                name: "asc", 
+            }
+        });
+
+        res.status(200).send({
+            meta: { 
+                success: true, 
+                message: "Berhasil mendapatkan kategori publik" 
+            },
+            data: categories,
+        });
+    } catch (error) {
+        res.status(500).send({
+            meta: { 
+                success: false, 
+                message: "Terjadi kesalahan di server" 
+            },
+            errors: error,
+        });
+    }
+};
+
 module.exports = {
     findCategories,
     createCategory,
@@ -211,4 +242,5 @@ module.exports = {
     updateCategory,
     deleteCategory,
     allCategories,
+    publicCategories
 };

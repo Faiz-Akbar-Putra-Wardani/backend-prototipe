@@ -322,6 +322,168 @@ const allProducts = async (req, res) => {
     }
 };
 
+const publicProducts = async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 12; // 12 produk per page untuk grid
+        const skip = (page - 1) * limit;
+        const categoryUuid = req.query.category; // Filter by category UUID
+
+        // Build where condition
+        let whereCondition = {};
+        
+        if (categoryUuid) {
+            // Cari category_id dari UUID
+            const category = await prisma.category.findUnique({
+                where: { uuid: categoryUuid },
+                select: { id: true }
+            });
+            
+            if (category) {
+                whereCondition.category_id = category.id;
+            }
+        }
+
+        const products = await prisma.product.findMany({
+            where: whereCondition,
+            select: {
+                uuid: true,      
+                title: true,
+                image: true,
+                sell_price: true,
+                rent_price: true,
+                stock: true,
+                category: {
+                    select: { 
+                        uuid: true,
+                        name: true 
+                    },
+                },
+                
+                ProductSpecification: {
+                    select: {
+                        brand: true,
+                        model: true,
+                    },
+                    take: 1, 
+                }
+            },
+            orderBy: { created_at: "desc" },
+            skip,
+            take: limit,
+        });
+
+        const total = await prisma.product.count({
+            where: whereCondition,
+        });
+
+        res.status(200).send({
+            meta: { 
+                success: true, 
+                message: "Berhasil mendapatkan produk publik" 
+            },
+            data: products,
+            pagination: {
+                currentPage: page,
+                totalPages: Math.ceil(total / limit),
+                perPage: limit,
+                total,
+            },
+        });
+    } catch (error) {
+        console.error("Error in publicProducts:", error);
+        res.status(500).send({
+            meta: { 
+                success: false, 
+                message: "Terjadi kesalahan di server" 
+            },
+            errors: [{ msg: error.message, path: "general" }],
+        });
+    }
+};
+
+const publicProductDetail = async (req, res) => {
+    const { uuid } = req.params;
+    
+    try {
+        const product = await prisma.product.findUnique({
+            where: { uuid },
+            select: {
+                uuid: true,
+                title: true,
+                description: true,
+                image: true,
+                sell_price: true,
+                rent_price: true,
+                stock: true,
+                created_at: true,
+                category: {
+                    select: { 
+                        uuid: true,
+                        name: true,
+                        image: true,
+                    },
+                },
+               
+                ProductSpecification: {
+                    select: {
+                        uuid: true,
+                        brand: true,
+                        model: true,
+                        cylinder: true,
+                        piston_displ: true,
+                        rated_speed: true,
+                        bore_stroke: true,
+                        governor: true,
+                        aspiration: true,
+                        oil_capacity: true,
+                        fuel_capacity: true,
+                        cooling_system: true,
+                        load_100: true,
+                        load_75: true,
+                        load_50: true,
+                        prime_power: true,
+                        standby_power: true,
+                        voltage: true,
+                        alternator: true,
+                        dimension_open: true,
+                        weight_open: true,
+                        dimension_silent: true,
+                        weight_silent: true,
+                    }
+                }
+            },
+        });
+
+        if (!product) {
+            return res.status(404).send({
+                meta: { 
+                    success: false, 
+                    message: `Produk dengan UUID ${uuid} tidak ditemukan` 
+                },
+            });
+        }
+
+        res.status(200).send({
+            meta: { 
+                success: true, 
+                message: "Berhasil mendapatkan detail produk" 
+            },
+            data: product,
+        });
+    } catch (error) {
+        console.error("Error in publicProductDetail:", error);
+        res.status(500).send({
+            meta: { 
+                success: false, 
+                message: "Terjadi kesalahan di server" 
+            },
+            errors: [{ msg: error.message, path: "general" }],
+        });
+    }
+};
+
+
 module.exports = {
     findProducts,
     createProduct,
@@ -330,4 +492,6 @@ module.exports = {
     deleteProduct,
     findProductByCategoryId,
     allProducts,
+    publicProducts,
+    publicProductDetail
 };

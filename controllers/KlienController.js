@@ -281,30 +281,32 @@ const deleteClient = async (req, res) => {
 };
 
 // Ambil semua clients (tanpa pagination)
-const allClients = async (req, res) => {
+const publicClients = async (req, res) => {
     try {
+        const limit = parseInt(req.query.limit) || 20; 
+        
         const clients = await prisma.partnership.findMany({
             select: {
-                uuid: true,  
                 name: true,
                 image: true,
-                created_at: true,
-                updated_at: true,
+                
             },
             orderBy: {
-                id: "desc",
-            }
+                created_at: "desc", 
+            },
+            take: limit, 
         });
 
         res.status(200).send({
             meta: {
                 success: true,
-                message: "Berhasil mendapatkan semua klien",
+                message: "Berhasil mendapatkan daftar klien",
             },
-            data: clients
+            data: clients,
         });
+
     } catch (error) {
-        console.error("Error in allClients:", error);
+        console.error("Error in publicClients:", error);
         res.status(500).send({
             meta: {
                 success: false,
@@ -321,5 +323,5 @@ module.exports = {
     findClientsById, 
     updateClient, 
     deleteClient, 
-    allClients
+    publicClients
 };
