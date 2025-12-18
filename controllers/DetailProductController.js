@@ -93,12 +93,10 @@ const findDetailProducts = async (req, res) => {
 // Ambil detail produk by UUID
 const findDetailProductById = async (req, res) => {
   try {
-    const { uuid } = req.params; 
-
-    console.log("Fetching detail product with UUID:", uuid);
+    const { uuid } = req.params;
 
     const spec = await prisma.productSpecification.findUnique({
-      where: { uuid },  
+      where: { uuid },
       select: {
         uuid: true,
         product_id: true,
@@ -144,8 +142,6 @@ const findDetailProductById = async (req, res) => {
       });
     }
 
-    console.log("Detail product found:", spec);
-
     res.status(200).json({
       meta: { success: true, message: "Berhasil mendapatkan detail produk" },
       data: spec,
@@ -185,19 +181,7 @@ const createDetailProduct = async (req, res) => {
       });
     }
 
-    // Validasi numeric fields
-    const load100 = parseFloat(data.load_100);
-    const load75 = parseFloat(data.load_75);
-    const load50 = parseFloat(data.load_50);
-
-    if (isNaN(load100) || isNaN(load75) || isNaN(load50)) {
-      return res.status(422).json({
-        success: false,
-        message: "Load values harus berupa angka",
-        errors: [{ msg: "Load 100, 75, dan 50 harus berupa angka", path: "load" }],
-      });
-    }
-
+    // Langsung gunakan string, tidak perlu parseFloat lagi
     const newSpec = await prisma.productSpecification.create({
       data: {
         product_id: productId,
@@ -212,9 +196,9 @@ const createDetailProduct = async (req, res) => {
         oil_capacity: data.oil_capacity,
         fuel_capacity: data.fuel_capacity,
         cooling_system: data.cooling_system,
-        load_100: load100,
-        load_75: load75,
-        load_50: load50,
+        load_100: data.load_100,      
+        load_75: data.load_75,        
+        load_50: data.load_50,        
         prime_power: data.prime_power,
         standby_power: data.standby_power,
         voltage: data.voltage,
@@ -255,14 +239,12 @@ const createDetailProduct = async (req, res) => {
 // Update detail produk by UUID
 const updateDetailProduct = async (req, res) => {
   try {
-    const { uuid } = req.params;  
+    const { uuid } = req.params;
     const data = req.body;
-
-    console.log("Updating detail product with UUID:", uuid);
 
     // Cek apakah spec ada
     const spec = await prisma.productSpecification.findUnique({
-      where: { uuid },  
+      where: { uuid },
     });
 
     if (!spec) {
@@ -271,19 +253,7 @@ const updateDetailProduct = async (req, res) => {
       });
     }
 
-    // Validasi numeric fields
-    const load100 = parseFloat(data.load_100);
-    const load75 = parseFloat(data.load_75);
-    const load50 = parseFloat(data.load_50);
-
-    if (isNaN(load100) || isNaN(load75) || isNaN(load50)) {
-      return res.status(422).json({
-        success: false,
-        message: "Load values harus berupa angka",
-        errors: [{ msg: "Load 100, 75, dan 50 harus berupa angka", path: "load" }],
-      });
-    }
-
+    // Langsung gunakan string, tidak perlu parseFloat lagi
     const updateData = {
       brand: data.brand,
       model: data.model,
@@ -296,9 +266,9 @@ const updateDetailProduct = async (req, res) => {
       oil_capacity: data.oil_capacity,
       fuel_capacity: data.fuel_capacity,
       cooling_system: data.cooling_system,
-      load_100: load100,
-      load_75: load75,
-      load_50: load50,
+      load_100: data.load_100,      
+      load_75: data.load_75,        
+      load_50: data.load_50,        
       prime_power: data.prime_power,
       standby_power: data.standby_power,
       voltage: data.voltage,
@@ -318,7 +288,7 @@ const updateDetailProduct = async (req, res) => {
     }
 
     const updatedSpec = await prisma.productSpecification.update({
-      where: { uuid },  
+      where: { uuid },
       data: updateData,
       select: {
         uuid: true,
@@ -351,12 +321,10 @@ const updateDetailProduct = async (req, res) => {
 // Hapus detail produk by UUID
 const deleteDetailProduct = async (req, res) => {
   try {
-    const { uuid } = req.params;  
-
-    console.log("Deleting detail product with UUID:", uuid);
+    const { uuid } = req.params;
 
     const spec = await prisma.productSpecification.findUnique({
-      where: { uuid },  
+      where: { uuid },
     });
 
     if (!spec) {
@@ -366,7 +334,7 @@ const deleteDetailProduct = async (req, res) => {
     }
 
     await prisma.productSpecification.delete({
-      where: { uuid },  
+      where: { uuid },
     });
 
     res.status(200).json({
@@ -388,10 +356,10 @@ const findProductsByCategory = async (req, res) => {
 
     const products = await prisma.product.findMany({
       where: { category_id: Number(categoryId) },
-      select: { 
+      select: {
         id: true,
         uuid: true,
-        title: true 
+        title: true,
       },
       orderBy: { title: "asc" },
     });
@@ -408,7 +376,6 @@ const findProductsByCategory = async (req, res) => {
     });
   }
 };
-
 
 module.exports = {
   findDetailProducts,

@@ -325,15 +325,15 @@ const allProducts = async (req, res) => {
 const publicProducts = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 12; // 12 produk per page untuk grid
+        const limit = parseInt(req.query.limit) || 12;
         const skip = (page - 1) * limit;
-        const categoryUuid = req.query.category; // Filter by category UUID
+        const categoryUuid = req.query.category;
+        const search = req.query.search || ""; 
 
         // Build where condition
         let whereCondition = {};
         
         if (categoryUuid) {
-            // Cari category_id dari UUID
             const category = await prisma.category.findUnique({
                 where: { uuid: categoryUuid },
                 select: { id: true }
@@ -342,6 +342,50 @@ const publicProducts = async (req, res) => {
             if (category) {
                 whereCondition.category_id = category.id;
             }
+        }
+
+        if (search && search.trim()) {
+            whereCondition.OR = [
+                // Search di title product
+                {
+                    title: {
+                        contains: search,
+                    }
+                },
+                // Search di specifications (brand)
+                {
+                    specifications: {
+                        some: {
+                            brand: {
+                                contains: search,
+                             
+                            }
+                        }
+                    }
+                },
+                // Search di specifications (model)
+                {
+                    specifications: {
+                        some: {
+                            model: {
+                                contains: search,
+                              
+                            }
+                        }
+                    }
+                },
+                // Search di specifications (prime_power)
+                {
+                    specifications: {
+                        some: {
+                            prime_power: {
+                                contains: search,
+                                
+                            }
+                        }
+                    }
+                }
+            ];
         }
 
         const products = await prisma.product.findMany({
@@ -359,11 +403,11 @@ const publicProducts = async (req, res) => {
                         name: true 
                     },
                 },
-                
-                ProductSpecification: {
+                specifications: {
                     select: {
                         brand: true,
                         model: true,
+                        prime_power: true,
                     },
                     take: 1, 
                 }
@@ -402,6 +446,7 @@ const publicProducts = async (req, res) => {
     }
 };
 
+
 const publicProductDetail = async (req, res) => {
     const { uuid } = req.params;
     
@@ -425,7 +470,7 @@ const publicProductDetail = async (req, res) => {
                     },
                 },
                
-                ProductSpecification: {
+                specifications: {
                     select: {
                         uuid: true,
                         brand: true,

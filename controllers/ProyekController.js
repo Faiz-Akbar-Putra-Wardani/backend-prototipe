@@ -353,11 +353,29 @@ const publicProjects = async (req, res) => {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 12;
         const skip = (page - 1) * limit;
-        const categorySlug = req.query.category; 
+        const categorySlug = req.query.category;
+        const search = req.query.search || ""; // ✅ Tambahkan search
 
         let whereCondition = {};
 
-        // Filter by category slug jika ada
+        // ✅ Filter by search - cari di project_name dan location
+        if (search && search.trim()) {
+            whereCondition.OR = [
+                {
+                    project_name: {
+                        contains: search,
+                        
+                    }
+                },
+                {
+                    location: {
+                        contains: search,
+                    }
+                }
+            ];
+        }
+
+        // Filter by category slug
         if (categorySlug) {
             whereCondition.category = {
                 slug: categorySlug
@@ -414,6 +432,7 @@ const publicProjects = async (req, res) => {
         });
     }
 };
+
 
 module.exports = {
     findProjects,

@@ -99,9 +99,9 @@ model ProductSpecification {
   oil_capacity     String
   fuel_capacity    String
   cooling_system   String
-  load_100         Float
-  load_75          Float
-  load_50          Float
+  load_100         String
+  load_75          String
+  load_50          String
   prime_power      String
   standby_power    String
   voltage          String

@@ -36,19 +36,13 @@ const validateDetailProduct = [
   body("weight_silent").notEmpty().withMessage("Weight (silent) is required"),
 
   body("load_100")
-    .notEmpty().withMessage("Load 100% is required")
-    .bail()
-    .isFloat({ min: 0 }).withMessage("Load 100% must be a valid number"),
+    .notEmpty().withMessage("Load 100% is required"),
 
   body("load_75")
-    .notEmpty().withMessage("Load 75% is required")
-    .bail()
-    .isFloat({ min: 0 }).withMessage("Load 75% must be a valid number"),
+    .notEmpty().withMessage("Load 75% is required"),
 
   body("load_50")
-    .notEmpty().withMessage("Load 50% is required")
-    .bail()
-    .isFloat({ min: 0 }).withMessage("Load 50% must be a valid number"),
+    .notEmpty().withMessage("Load 50% is required"),
 ];
 
 module.exports = { validateDetailProduct };
