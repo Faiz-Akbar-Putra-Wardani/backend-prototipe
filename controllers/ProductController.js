@@ -294,6 +294,7 @@ const findProductByCategoryId = async (req, res) => {
 };
 
 // Semua produk (dropdown)
+// Semua produk (dropdown)
 const allProducts = async (req, res) => {
     try {
         const products = await prisma.product.findMany({
@@ -306,21 +307,31 @@ const allProducts = async (req, res) => {
                 image: true,
                 stock: true,
                 category: { select: { id: true, name: true } },
+                _count: {
+                    select: { specifications: true }
+                }
             },
             orderBy: { id: "desc" },
         });
 
+        const productsWithFlag = products.map(p => ({
+            ...p,
+            hasDetailProduct: p._count.specifications > 0
+        }));
+
         res.status(200).send({
             meta: { success: true, message: "Berhasil mengambil semua produk" },
-            data: products,
+            data: productsWithFlag, 
         });
     } catch (error) {
+        console.error("Error in allProducts:", error);  
         res.status(500).send({
             meta: { success: false, message: "Kesalahan internal server" },
-            errors: error.message,
+            errors: [{ msg: error.message, path: "general" }],  
         });
     }
 };
+
 
 const publicProducts = async (req, res) => {
     try {

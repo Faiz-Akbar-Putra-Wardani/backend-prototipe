@@ -7,6 +7,14 @@ const path = require('path')
 
 const app = express();
 
+const allowedOrigins = [
+  'http://localhost:5173',  
+  'http://localhost:5174',  
+  'http://localhost:8080',  
+  'http://localhost:3001',  
+  
+];
+
 app.use(cors());
 
 app.use(bodyParser.urlencoded({ extended: false }));

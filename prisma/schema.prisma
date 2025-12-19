@@ -90,7 +90,7 @@ model Product {
 model ProductSpecification {
   id               Int       @id @default(autoincrement())
   uuid             String    @unique @default(uuid())
-  product_id       Int
+  product_id       Int       @unique
   brand            String
   model            String
   cylinder         String

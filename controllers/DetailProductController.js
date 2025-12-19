@@ -156,6 +156,7 @@ const findDetailProductById = async (req, res) => {
 };
 
 // Buat detail produk baru
+// Buat detail produk baru
 const createDetailProduct = async (req, res) => {
   try {
     const data = req.body;
@@ -178,6 +179,24 @@ const createDetailProduct = async (req, res) => {
     if (!product) {
       return res.status(404).json({
         meta: { success: false, message: "Produk tidak ditemukan" },
+      });
+    }
+
+    
+    const existingDetail = await prisma.productSpecification.findFirst({
+      where: { product_id: productId },
+    });
+
+    if (existingDetail) {
+      return res.status(409).json({
+        meta: { 
+          success: false, 
+          message: "Detail produk untuk produk ini sudah ada" 
+        },
+        errors: [{ 
+          msg: `Produk "${product.title}" sudah memiliki detail produk. Tidak dapat membuat detail produk duplikat.`, 
+          path: "product_id" 
+        }],
       });
     }
 
@@ -235,6 +254,7 @@ const createDetailProduct = async (req, res) => {
     });
   }
 };
+
 
 // Update detail produk by UUID
 const updateDetailProduct = async (req, res) => {

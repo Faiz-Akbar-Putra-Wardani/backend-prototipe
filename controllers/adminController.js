@@ -173,12 +173,14 @@ const deleteAdmin = async (req, res) => {
             });
         }
 
-        // Cegah hapus super admin terakhir
         if (admin.role === "super_admin") {
             const count = await prisma.user.count({ where: { role: "super_admin" } });
             if (count <= 1) {
                 return res.status(400).send({
-                    meta: { success: false, message: "Tidak dapat menghapus super admin terakhir" }
+                    meta: { 
+                        success: false, 
+                        message: "Tidak dapat menghapus super admin terakhir. Sistem harus memiliki minimal 1 super admin." 
+                    }
                 });
             }
         }
@@ -190,9 +192,14 @@ const deleteAdmin = async (req, res) => {
         });
 
     } catch (error) {
-        res.status(500).send({ meta: { success: false, message: "Server error" }, errors: error });
+        console.error("Error deleting admin:", error);
+        res.status(500).send({ 
+            meta: { success: false, message: "Server error" }, 
+            errors: [{ msg: error.message, path: "general" }]
+        });
     }
 };
+
 
 const allAdmins = async (req, res) => {
     try {
