@@ -1,20 +1,18 @@
-// Import express untuk membuat aplikasi web
+// controllers/RentalController.js
+
 const express = require("express");
-
-// Import prisma client
 const prisma = require("../prisma/client");
-
-// Import generator invoice
 const { generateUniqueRentalInvoice } = require("../utils/generateUniqueRentalInvoice");
-
 const { diffMonths } = require("../utils/date");
+
 const createRental = async (req, res) => {
   try {
     const invoice = await generateUniqueRentalInvoice();
 
     const customerUuid = req.body.customer_id;
     const dp = Number(req.body.dp || 0);
-    const status = req.body.status ?? "berlangsung";
+    const status = req.body.status ?? "proses"; // Changed default to 'proses'
+    const userId = parseInt(req.userId); // User yang membuat
 
     // VALIDASI CUSTOMER EXISTS by UUID
     const customerExists = await prisma.customer.findUnique({
@@ -31,16 +29,17 @@ const createRental = async (req, res) => {
     }
 
     // VALIDASI STATUS
-    const validStatuses = ['berlangsung', 'selesai'];
+    const validStatuses = ['proses', 'disewa', 'selesai'];
     if (!validStatuses.includes(status)) {
       return res.status(422).json({
         meta: {
           success: false,
-          message: "Status harus: berlangsung atau selesai",
+          message: "Status harus: proses, disewa, atau selesai",
         },
       });
     }
 
+    // Validasi details
     for (const d of req.body.details) {
       const productExists = await prisma.product.findUnique({
         where: { uuid: d.product_id }
@@ -62,7 +61,7 @@ const createRental = async (req, res) => {
         return res.status(422).json({
           meta: {
             success: false,
-            message: `Tanggal selesai tidak boleh lebih awal dari tanggal mulai untuk produk ${productExists.name}`
+            message: `Tanggal selesai tidak boleh lebih awal dari tanggal mulai untuk produk ${productExists.title}`
           }
         });
       }
@@ -73,7 +72,7 @@ const createRental = async (req, res) => {
         return res.status(422).json({
           meta: {
             success: false,
-            message: `Tanggal sewa tidak valid untuk produk ${productExists.name}`
+            message: `Tanggal sewa tidak valid untuk produk ${productExists.title}`
           }
         });
       }
@@ -81,6 +80,7 @@ const createRental = async (req, res) => {
 
     let totalRent = 0;
 
+    // 1. Create rental
     const rental = await prisma.rental.create({
       data: {
         customer_id: customerExists.id,
@@ -91,6 +91,17 @@ const createRental = async (req, res) => {
       },
     });
 
+    // 2. Create initial tracking record
+    await prisma.rentalTracking.create({
+      data: {
+        rental_id: rental.id,
+        status: status,
+        notes: `Penyewaan dibuat dengan status ${status}`,
+        updated_by: userId,
+      }
+    });
+
+    // 3. Create rental details and profits
     for (const d of req.body.details) {
       const productExists = await prisma.product.findUnique({
         where: { uuid: d.product_id }
@@ -109,7 +120,7 @@ const createRental = async (req, res) => {
       await prisma.rentalDetail.create({
         data: {
           rental_id: rental.id,
-          product_id: productExists.id,  
+          product_id: productExists.id,
           qty,
           rent_price: pricePerMonth,
           start_date: startDate,
@@ -130,6 +141,7 @@ const createRental = async (req, res) => {
     if (dp > totalRent) {
       await prisma.rentalDetail.deleteMany({ where: { rental_id: rental.id } });
       await prisma.profit.deleteMany({ where: { rental_id: rental.id } });
+      await prisma.rentalTracking.deleteMany({ where: { rental_id: rental.id } });
       await prisma.rental.delete({ where: { id: rental.id } });
 
       return res.status(422).json({ 
@@ -143,6 +155,7 @@ const createRental = async (req, res) => {
     if (dp < 0) {
       await prisma.rentalDetail.deleteMany({ where: { rental_id: rental.id } });
       await prisma.profit.deleteMany({ where: { rental_id: rental.id } });
+      await prisma.rentalTracking.deleteMany({ where: { rental_id: rental.id } });
       await prisma.rental.delete({ where: { id: rental.id } });
 
       return res.status(422).json({
@@ -182,7 +195,6 @@ const createRental = async (req, res) => {
   }
 };
 
-
 const updateRental = async (req, res) => {
   try {
     const { uuid } = req.params;
@@ -204,7 +216,7 @@ const updateRental = async (req, res) => {
 
     const customerUuid = req.body.customer_id;
     const dp = Number(req.body.dp || 0);
-    const status = req.body.status ?? "berlangsung";
+    const status = req.body.status ?? "proses";
 
     if (!customerUuid) {
       return res.status(400).json({
@@ -230,17 +242,17 @@ const updateRental = async (req, res) => {
     }
 
     // VALIDASI STATUS
-    const validStatuses = ['berlangsung', 'selesai'];
+    const validStatuses = ['proses', 'disewa', 'selesai'];
     if (!validStatuses.includes(status)) {
       return res.status(422).json({
         meta: {
           success: false,
-          message: "Status harus: berlangsung atau selesai",
+          message: "Status harus: proses, disewa, atau selesai",
         },
       });
     }
 
-    //  Validasi dan convert product UUID ke ID
+    // Validasi details
     for (const d of req.body.details) {
       if (!d.product_id) {
         return res.status(400).json({
@@ -294,9 +306,8 @@ const updateRental = async (req, res) => {
     await prisma.rentalDetail.deleteMany({ where: { rental_id: existingRental.id } });
     await prisma.profit.deleteMany({ where: { rental_id: existingRental.id } });
 
-    // Insert detail baru dengan convert UUID ke ID
+    // Insert detail baru
     for (const d of req.body.details) {
-      // Convert product UUID ke ID
       const productExists = await prisma.product.findUnique({
         where: { uuid: d.product_id }
       });
@@ -314,7 +325,7 @@ const updateRental = async (req, res) => {
       await prisma.rentalDetail.create({
         data: {
           rental_id: existingRental.id,
-          product_id: productExists.id,  
+          product_id: productExists.id,
           qty,
           rent_price: pricePerMonth,
           start_date: startDate,
@@ -354,7 +365,7 @@ const updateRental = async (req, res) => {
     const updatedRental = await prisma.rental.update({
       where: { uuid },
       data: { 
-        customer_id: customerExists.id,  
+        customer_id: customerExists.id,
         dp,
         total_rent_price: totalRent,
         status
@@ -381,7 +392,6 @@ const updateRental = async (req, res) => {
   }
 };
 
-
 // GET ALL RENTAL + PAGINATION + SEARCH
 const getRentals = async (req, res) => {
   try {
@@ -407,7 +417,7 @@ const getRentals = async (req, res) => {
     const rentals = await prisma.rental.findMany({
       where,
       select: {
-        uuid: true, 
+        uuid: true,
         invoice: true,
         dp: true,
         total_rent_price: true,
@@ -467,10 +477,10 @@ const getRentals = async (req, res) => {
   }
 };
 
-//  GET RENTAL BY UUID
+// GET RENTAL BY UUID
 const getRentalById = async (req, res) => {
   try {
-    const { uuid } = req.params; 
+    const { uuid } = req.params;
 
     console.log("Fetching rental with UUID:", uuid);
 
@@ -508,6 +518,16 @@ const getRentalById = async (req, res) => {
             },
           },
         },
+        trackings: { // NEW: Include tracking history
+          select: {
+            status: true,
+            notes: true,
+            created_at: true,
+          },
+          orderBy: {
+            created_at: 'asc'
+          }
+        }
       },
     });
 
@@ -539,7 +559,7 @@ const getRentalByInvoice = async (req, res) => {
   try {
     const invoice = req.params.invoice;
 
-    console.log("Fetching rental by invoice:", invoice); 
+    console.log("Fetching rental by invoice:", invoice);
 
     const rental = await prisma.rental.findUnique({
       where: { invoice },
@@ -569,13 +589,23 @@ const getRentalByInvoice = async (req, res) => {
             product: {
               select: {
                 uuid: true,
-                title: true,  
+                title: true,
                 description: true,
-                image: true,  
+                image: true,
               }
             },
           },
         },
+        trackings: { // NEW: Include tracking history
+          select: {
+            status: true,
+            notes: true,
+            created_at: true,
+          },
+          orderBy: {
+            created_at: 'asc'
+          }
+        }
       },
     });
 
@@ -599,6 +629,88 @@ const getRentalByInvoice = async (req, res) => {
   }
 };
 
+// NEW: Get tracking by invoice (Public)
+const getRentalTrackingByInvoice = async (req, res) => {
+  try {
+    const { invoice } = req.params;
+
+    console.log("Fetching rental tracking for invoice:", invoice);
+
+    if (!invoice) {
+      return res.status(400).json({
+        meta: { success: false, message: "Invoice wajib diisi" },
+      });
+    }
+
+    const rental = await prisma.rental.findUnique({
+      where: { invoice },
+      select: {
+        uuid: true,
+        invoice: true,
+        total_rent_price: true,
+        status: true,
+        created_at: true,
+        customer: {
+          select: {
+            name_perusahaan: true,
+            no_telp: true,
+            address: true,
+          }
+        },
+        details: {
+          select: {
+            qty: true,
+            rent_price: true,
+            start_date: true,
+            end_date: true,
+            product: {
+              select: {
+                title: true,
+                image: true,
+              }
+            }
+          }
+        },
+        trackings: {
+          select: {
+            status: true,
+            notes: true,
+            created_at: true,
+          },
+          orderBy: {
+            created_at: 'asc'
+          }
+        }
+      },
+    });
+
+    if (!rental) {
+      return res.status(404).json({
+        meta: { success: false, message: "Invoice tidak ditemukan" },
+      });
+    }
+
+    res.status(200).json({
+      meta: {
+        success: true,
+        message: "Tracking berhasil diambil",
+      },
+      data: {
+        type: 'penyewaan',
+        grand_total: rental.total_rent_price, // Alias for consistency
+        ...rental
+      },
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      meta: { success: false, message: "Terjadi kesalahan pada server" },
+      errors: error.message,
+    });
+  }
+};
+
 const getNewInvoice = async (req, res) => {
   try {
     const invoice = await generateUniqueRentalInvoice();
@@ -615,11 +727,12 @@ const getNewInvoice = async (req, res) => {
   }
 };
 
-//  UPDATE RENTAL STATUS ONLY (PATCH - Tanpa validasi penuh)
+// UPDATE RENTAL STATUS ONLY
 const updateRentalStatus = async (req, res) => {
   try {
-    const { uuid } = req.params; 
-    const { status } = req.body;
+    const { uuid } = req.params;
+    const { status, notes } = req.body;
+    const userId = parseInt(req.userId);
 
     console.log("Updating rental status with UUID:", uuid);
     console.log("New status:", status);
@@ -631,17 +744,17 @@ const updateRentalStatus = async (req, res) => {
     }
 
     // VALIDASI STATUS
-    const validStatuses = ['berlangsung', 'selesai'];
+    const validStatuses = ['proses', 'disewa', 'selesai'];
     if (!validStatuses.includes(status)) {
       return res.status(422).json({
         meta: {
           success: false,
-          message: "Status harus: berlangsung atau selesai",
+          message: "Status harus: proses, disewa, atau selesai",
         },
       });
     }
 
-    // Cek apakah rental ada by UUID
+    // Cek apakah rental ada
     const exist = await prisma.rental.findUnique({
       where: { uuid },
     });
@@ -652,14 +765,26 @@ const updateRentalStatus = async (req, res) => {
       });
     }
 
+    // Update status
     const rental = await prisma.rental.update({
       where: { uuid },
       data: { status },
       select: {
+        id: true,
         uuid: true,
         invoice: true,
         status: true,
         updated_at: true,
+      }
+    });
+
+    // Create tracking record
+    await prisma.rentalTracking.create({
+      data: {
+        rental_id: rental.id,
+        status: status,
+        notes: notes || `Status diubah menjadi ${status}`,
+        updated_by: userId,
       }
     });
 
@@ -668,7 +793,12 @@ const updateRentalStatus = async (req, res) => {
         success: true,
         message: "Status rental berhasil diperbarui",
       },
-      data: rental,
+      data: {
+        uuid: rental.uuid,
+        invoice: rental.invoice,
+        status: rental.status,
+        updated_at: rental.updated_at
+      },
     });
 
   } catch (error) {
@@ -685,7 +815,7 @@ const updateRentalStatus = async (req, res) => {
 
 const deleteRental = async (req, res) => {
   try {
-    const { uuid } = req.params; 
+    const { uuid } = req.params;
 
     console.log("Deleting rental with UUID:", uuid);
 
@@ -699,10 +829,7 @@ const deleteRental = async (req, res) => {
       });
     }
 
-    // Hapus detail & profit dulu (pakai id internal)
-    // await prisma.rentalDetail.deleteMany({ where: { rental_id: rental.id } });
-    // await prisma.profit.deleteMany({ where: { rental_id: rental.id } });
-
+    // Cascade akan handle detail, profit, dan tracking
     await prisma.rental.delete({ where: { uuid } });
 
     res.status(200).json({
@@ -728,4 +855,5 @@ module.exports = {
   updateRentalStatus,
   updateRental,
   deleteRental,
+  getRentalTrackingByInvoice, // NEW
 };

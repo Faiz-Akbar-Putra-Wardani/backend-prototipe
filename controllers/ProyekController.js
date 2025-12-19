@@ -354,11 +354,11 @@ const publicProjects = async (req, res) => {
         const limit = parseInt(req.query.limit) || 12;
         const skip = (page - 1) * limit;
         const categorySlug = req.query.category;
-        const search = req.query.search || ""; // ✅ Tambahkan search
+        const search = req.query.search || ""; 
 
         let whereCondition = {};
 
-        // ✅ Filter by search - cari di project_name dan location
+        // Filter by search - cari di project_name dan location
         if (search && search.trim()) {
             whereCondition.OR = [
                 {

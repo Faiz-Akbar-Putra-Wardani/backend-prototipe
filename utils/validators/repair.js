@@ -70,7 +70,7 @@ const validateRepair = [
   // Status - wajib
   body("status")
     .notEmpty().withMessage("Status wajib dipilih")
-    .isIn(['masuk', 'proses', 'selesai']).withMessage("Status harus: masuk, proses atau selesai"),
+    .isIn(['masuk', 'dikerjakan', 'selesai']).withMessage("Status harus: masuk, dikerjakan atau selesai"),
     
   // Image validation untuk multer
   check("image").custom((value, { req }) => {

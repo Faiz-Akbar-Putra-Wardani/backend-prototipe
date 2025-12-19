@@ -78,6 +78,26 @@ const routes = [
     handler: clientController.publicClients
   },
 
+  {
+    method: 'get',
+    path: '/public/tracking/:invoice',
+    middlewares: [],
+    handler: transactionController.getTrackingByInvoice
+  },
+  {
+    method: 'get',
+    path: '/public/tracking/repair/:invoice',
+    middlewares: [],
+    handler: repairController.getRepairTrackingByInvoice
+  },
+
+   {
+    method: 'get',
+    path: '/public/tracking/rental/:invoice',
+    middlewares: [],
+    handler: rentalController.getRentalTrackingByInvoice
+  },
+
   // PROTECTED ROUTES (Admin)
   // Admin Routes
   { 

@@ -23,8 +23,7 @@ const createTransaction = async (req, res) => {
         const pph = parseFloat(req.body.pph) || 0;
         const pphNominal = parseFloat(req.body.pph_nominal) || 0;
         const grandTotal = parseFloat(req.body.grand_total);
-        const status = req.body.status;
-
+        const status = req.body.status || 'proses'; // default: proses
 
         // Validasi wajib
         if (isNaN(cashierId) || isNaN(grandTotal)) {
@@ -36,18 +35,14 @@ const createTransaction = async (req, res) => {
             });
         }
 
+        // Validasi customer
         let customerId = null;
         if (customerUuid) {
-            console.log("🔍 Searching customer with UUID:", customerUuid);
-            
             const customerExists = await prisma.customer.findUnique({
                 where: { uuid: customerUuid }
             });
 
-            console.log(" Customer found:", customerExists);
-
             if (!customerExists) {
-                console.log("Customer NOT FOUND with UUID:", customerUuid);
                 return res.status(404).json({
                     meta: {
                         success: false,
@@ -57,10 +52,7 @@ const createTransaction = async (req, res) => {
             }
 
             customerId = customerExists.id; 
-        } else {
-            console.log(" No customer_id provided, will save as NULL");
         }
-
 
         // VALIDASI STATUS
         const validStatuses = ['proses', 'dikirim', 'selesai'];
@@ -151,7 +143,18 @@ const createTransaction = async (req, res) => {
                 status,
             },
         });
-        // 2. Ambil semua cart milik kasir
+
+        // 2. Create initial tracking record
+        await prisma.transactionTracking.create({
+            data: {
+                transaction_id: transaction.id,
+                status: status,
+                notes: `Transaksi penjualan dibuat dengan status ${status}`,
+                updated_by: cashierId,
+            }
+        });
+
+        // 3. Ambil semua cart milik kasir
         const carts = await prisma.cart.findMany({
             where: { cashier_id: cashierId },
             include: { product: true },
@@ -167,7 +170,7 @@ const createTransaction = async (req, res) => {
             });
         }
 
-        // 3. Loop item cart → simpan detail + profit
+        // 4. Loop item cart → simpan detail
         for (const cart of carts) {
             await prisma.transactionDetail.create({
                 data: {
@@ -179,7 +182,7 @@ const createTransaction = async (req, res) => {
             });
         }
 
-        // Simpan profit
+        // 5. Simpan profit
         await prisma.profit.create({
             data: {
                 transaction_id: transaction.id,
@@ -188,7 +191,7 @@ const createTransaction = async (req, res) => {
             },
         });
 
-        // 4. Bersihkan cart kasir
+        // 6. Bersihkan cart kasir
         await prisma.cart.deleteMany({
             where: { cashier_id: cashierId },
         });
@@ -565,11 +568,95 @@ const getTransactionById = async (req, res) => {
     }
 };
 
+// NEW: Get tracking by invoice (Public)
+const getTrackingByInvoice = async (req, res) => {
+  try {
+    const { invoice } = req.params;
+
+    console.log("Fetching tracking for invoice:", invoice);
+
+    if (!invoice) {
+      return res.status(400).json({
+        meta: { success: false, message: "Invoice wajib diisi" },
+      });
+    }
+
+    const transaction = await prisma.transaction.findUnique({
+      where: { invoice },
+      select: {
+        uuid: true,
+        invoice: true,
+        grand_total: true,
+        status: true,
+        created_at: true,
+        customer: {
+          select: {
+            name_perusahaan: true,
+            no_telp: true,
+            address: true,
+          }
+        },
+        transaction_details: {
+          select: {
+            qty: true,
+            price: true,
+            product: {
+              select: {
+                title: true,
+                image: true,
+              }
+            }
+          }
+        },
+        trackings: {
+          select: {
+            status: true,
+            notes: true,
+            created_at: true,
+            user: {
+              select: {
+                name: true,
+              }
+            }
+          },
+          orderBy: {
+            created_at: 'asc'
+          }
+        }
+      },
+    });
+
+    if (!transaction) {
+      return res.status(404).json({
+        meta: { success: false, message: "Invoice tidak ditemukan" },
+      });
+    }
+
+    res.status(200).json({
+      meta: {
+        success: true,
+        message: "Tracking berhasil diambil",
+      },
+      data: {
+        type: 'penjualan',
+        ...transaction
+      },
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      meta: { success: false, message: "Terjadi kesalahan pada server" },
+      errors: error.message,
+    });
+  }
+};
+
+
+// Update existing getTransactionByInvoice to include trackings
 const getTransactionByInvoice = async (req, res) => {
   try {
     const invoice = req.params.invoice;
-
-    console.log("Fetching transaction by invoice:", invoice);
 
     if (!invoice) {
       return res.status(400).json({
@@ -624,6 +711,22 @@ const getTransactionByInvoice = async (req, res) => {
             },
           },
         },
+        trackings: { // NEW
+          select: {
+            status: true,
+            notes: true,
+            created_at: true,
+            user: {
+              select: {
+                name: true,
+                email: true,
+              }
+            }
+          },
+          orderBy: {
+            created_at: 'asc'
+          }
+        }
       },
     });
 
@@ -670,7 +773,8 @@ const getNewInvoice = async (req, res) => {
 const updateStatus = async (req, res) => {
   try {
     const { uuid } = req.params;
-    const { status } = req.body;
+    const { status, notes } = req.body;
+    const userId = parseInt(req.userId);
 
     console.log("Updating transaction status with UUID:", uuid);
     console.log("New status:", status);
@@ -701,15 +805,27 @@ const updateStatus = async (req, res) => {
       });
     }
 
+    // Update transaction status
     const trx = await prisma.transaction.update({
       where: { uuid },
       data: { status },
       select: {
+        id: true,
         uuid: true,
         invoice: true,
         status: true,
         created_at: true, 
       }
+    });
+
+    // Create tracking record
+    await prisma.transactionTracking.create({
+        data: {
+            transaction_id: trx.id,
+            status: status,
+            notes: notes || `Status diubah menjadi ${status}`,
+            updated_by: userId,
+        }
     });
 
     res.status(200).json({
@@ -788,5 +904,6 @@ module.exports = {
     getNewInvoice,
     updateStatus,
     updateTransaction,
-    deleteTransaction
+    deleteTransaction,
+    getTrackingByInvoice,
 };

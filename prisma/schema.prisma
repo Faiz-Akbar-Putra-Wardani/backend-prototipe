@@ -8,16 +8,19 @@ datasource db {
 }
 
 model User {
-  id               Int           @id @default(autoincrement())
-  uuid             String        @unique @default(uuid())
+  id               Int                   @id @default(autoincrement())
+  uuid             String                @unique @default(uuid())
   name             String
   email            String
   password         String
-  role             String        @default("admin")
-  created_at       DateTime      @default(now())
-  updated_at       DateTime      @updatedAt
+  role             String                @default("admin")
+  created_at       DateTime              @default(now())
+  updated_at       DateTime              @updatedAt
   transactions     Transaction[]
   carts            Cart[]
+  trackings        TransactionTracking[] 
+  repair_trackings      RepairTracking[]
+  rental_trackings      RentalTracking[]   
 
   @@map("users")
 }
@@ -49,7 +52,7 @@ model Category {
   @@map("categories")
 }
 
-model Cart { // tidak perlu uuid
+model Cart {
   id          Int       @id @default(autoincrement())
   cashier_id  Int
   product_id  Int
@@ -57,8 +60,8 @@ model Cart { // tidak perlu uuid
   price       Float
   created_at  DateTime  @default(now())
   updated_at  DateTime  @updatedAt
-  cashier     User     @relation(fields: [cashier_id], references: [id], onDelete: Cascade)
-  product     Product  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  cashier     User      @relation(fields: [cashier_id], references: [id], onDelete: Cascade)
+  product     Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
 
   @@map("carts")
 }
@@ -118,25 +121,27 @@ model ProductSpecification {
 }
 
 model Transaction {
-  id                  Int                  @id @default(autoincrement())
-  uuid                String               @unique @default(uuid())
+  id                  Int                     @id @default(autoincrement())
+  uuid                String                  @unique @default(uuid())
   cashier_id          Int
   customer_id         Int?
-  invoice             String               @unique
+  invoice             String                  @unique
   subtotal            Float 
-  subtotalPlusExtra   Float @map("subExtraValue") 
-  extra               Float?                @default(0)
+  subtotalPlusExtra   Float                   @map("subExtraValue") 
+  extra               Float?                  @default(0)
   dp                  Float
   nego                Float
-  pph                 Float?                @default(0)
-  pph_nominal         Float?                @default(0)
+  pph                 Float?                  @default(0)
+  pph_nominal         Float?                  @default(0)
   grand_total         Float
-  status              String               
-  created_at          DateTime             @default(now())
-  cashier             User                 @relation(fields: [cashier_id], references: [id], onDelete: Cascade)
-  customer            Customer?            @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  status              String                  // proses, dikirim, selesai
+  created_at          DateTime                @default(now())
+  updated_at          DateTime                @updatedAt
+  cashier             User                    @relation(fields: [cashier_id], references: [id], onDelete: Cascade)
+  customer            Customer?               @relation(fields: [customer_id], references: [id], onDelete: Cascade)
   transaction_details TransactionDetail[]
   profits             Profit[]
+  trackings           TransactionTracking[]   // NEW: tracking history
 
   @@map("transactions")
 }
@@ -156,19 +161,36 @@ model TransactionDetail {
   @@map("transaction_details")
 }
 
+// NEW: Transaction Tracking History
+model TransactionTracking {
+  id              Int          @id @default(autoincrement())
+  uuid            String       @unique @default(uuid())
+  transaction_id  Int
+  status          String       // proses, dikirim, selesai
+  notes           String?      @db.Text
+  updated_by      Int?
+  created_at      DateTime     @default(now())
+  
+  transaction     Transaction  @relation(fields: [transaction_id], references: [id], onDelete: Cascade)
+  user            User?        @relation(fields: [updated_by], references: [id], onDelete: SetNull)
+
+  @@map("transaction_trackings")
+}
+
 model Rental {
-  id               Int       @id @default(autoincrement())
-  uuid             String    @unique @default(uuid())
+  id               Int              @id @default(autoincrement())
+  uuid             String           @unique @default(uuid())
   customer_id      Int
-  invoice          String     @unique
-  dp               Float?     @default(0)
+  invoice          String           @unique
+  dp               Float?           @default(0)
   total_rent_price Float
-  status           String
-  created_at       DateTime   @default(now())
-  updated_at       DateTime   @updatedAt
-  customer         Customer   @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  status           String           // proses, disewa, selesai
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @updatedAt
+  customer         Customer         @relation(fields: [customer_id], references: [id], onDelete: Cascade)
   details          RentalDetail[]
   profits          Profit[]
+  trackings        RentalTracking[] // NEW: tracking history
 
   @@map("rentals")
 }
@@ -191,38 +213,69 @@ model RentalDetail {
   @@map("rental_details")
 }
 
+model RentalTracking {
+  id          Int       @id @default(autoincrement())
+  uuid        String    @unique @default(uuid())
+  rental_id   Int
+  status      String    // proses, disewa, selesai
+  notes       String?   @db.Text
+  updated_by  Int?
+  created_at  DateTime  @default(now())
+  
+  rental      Rental    @relation(fields: [rental_id], references: [id], onDelete: Cascade)
+  user        User?     @relation(fields: [updated_by], references: [id], onDelete: SetNull)
+
+  @@map("rental_trackings")
+}
+
 model Repair {
-  id           Int       @id @default(autoincrement())
-  uuid         String    @unique @default(uuid())
-  customer_id  Int
-  item_repair  String 
-  invoice      String     @unique
-  start_date   DateTime
-  end_date     DateTime
-  description  String
-  component    String?
-  image        String?   
-  pic          String   
-  dp           Float?    @default(0)
-  repair_cost  Float
-  status       String
-  created_at   DateTime    @default(now())
-  updated_at   DateTime    @updatedAt
-  customer     Customer    @relation(fields: [customer_id], references: [id], onDelete: Cascade)
-  profits      Profit[]
+  id              Int              @id @default(autoincrement())
+  uuid            String           @unique @default(uuid())
+  customer_id     Int
+  item_repair     String 
+  invoice         String           @unique
+  start_date      DateTime
+  end_date        DateTime
+  description     String
+  component       String?
+  image           String?   
+  pic             String   
+  dp              Float?           @default(0)
+  repair_cost     Float
+  status          String           // proses, dikerjakan, selesai
+  created_at      DateTime         @default(now())
+  updated_at      DateTime         @updatedAt
+  customer        Customer         @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  profits         Profit[]
+  trackings       RepairTracking[] // NEW: tracking history
 
   @@map("repairs")
+}
+
+model RepairTracking {
+  id          Int       @id @default(autoincrement())
+  uuid        String    @unique @default(uuid())
+  repair_id   Int
+  status      String    // proses, dikerjakan, selesai
+  notes       String?   @db.Text
+  updated_by  Int?
+  created_at  DateTime  @default(now())
+  
+  repair      Repair    @relation(fields: [repair_id], references: [id], onDelete: Cascade)
+  user        User?     @relation(fields: [updated_by], references: [id], onDelete: SetNull) 
+
+  @@map("repair_trackings")
 }
 
 model Profit {
   id             Int        @id @default(autoincrement())
   uuid           String     @unique @default(uuid())
-  source         String
+  source         String     // penjualan, sewa, perbaikan
   transaction_id Int?
   rental_id      Int?
   repair_id      Int?
   total          Float
-  created_at     DateTime    @default(now())
+  created_at     DateTime   @default(now())
 
   transaction    Transaction? @relation(fields: [transaction_id], references: [id], onDelete: Cascade)
   rental         Rental?      @relation(fields: [rental_id], references: [id], onDelete: Cascade)
