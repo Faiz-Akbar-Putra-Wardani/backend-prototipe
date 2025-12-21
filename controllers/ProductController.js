@@ -294,7 +294,6 @@ const findProductByCategoryId = async (req, res) => {
 };
 
 // Semua produk (dropdown)
-// Semua produk (dropdown)
 const allProducts = async (req, res) => {
     try {
         const products = await prisma.product.findMany({

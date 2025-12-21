@@ -17,6 +17,8 @@ model User {
   created_at       DateTime              @default(now())
   updated_at       DateTime              @updatedAt
   transactions     Transaction[]
+  rentals          Rental[]
+  repairs          Repair[]
   carts            Cart[]
   trackings        TransactionTracking[] 
   repair_trackings      RepairTracking[]
@@ -180,6 +182,7 @@ model TransactionTracking {
 model Rental {
   id               Int              @id @default(autoincrement())
   uuid             String           @unique @default(uuid())
+   cashier_id       Int  
   customer_id      Int
   invoice          String           @unique
   dp               Float?           @default(0)
@@ -187,6 +190,7 @@ model Rental {
   status           String           // proses, disewa, selesai
   created_at       DateTime         @default(now())
   updated_at       DateTime         @updatedAt
+  cashier          User    @relation(fields: [cashier_id], references: [id], onDelete: Cascade)
   customer         Customer         @relation(fields: [customer_id], references: [id], onDelete: Cascade)
   details          RentalDetail[]
   profits          Profit[]
@@ -231,6 +235,7 @@ model RentalTracking {
 model Repair {
   id              Int              @id @default(autoincrement())
   uuid            String           @unique @default(uuid())
+   cashier_id      Int
   customer_id     Int
   item_repair     String 
   invoice         String           @unique
@@ -245,6 +250,7 @@ model Repair {
   status          String           // proses, dikerjakan, selesai
   created_at      DateTime         @default(now())
   updated_at      DateTime         @updatedAt
+ cashier         User    @relation(fields: [cashier_id], references: [id], onDelete: Cascade)
   customer        Customer         @relation(fields: [customer_id], references: [id], onDelete: Cascade)
   profits         Profit[]
   trackings       RepairTracking[] // NEW: tracking history

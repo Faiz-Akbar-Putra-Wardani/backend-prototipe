@@ -12,6 +12,7 @@ const createRepair = async (req, res) => {
     const invoice = await generateUniqueRepairInvoice();
 
     // Input dari frontend
+    const cashierId = parseInt(req.userId);
     const customerUuid = req.body.customer_id;  
     const itemRepair = req.body.item_repair;
     const startDate = new Date(req.body.start_date);
@@ -22,7 +23,6 @@ const createRepair = async (req, res) => {
     const dp = parseFloat(req.body.dp) || 0;
     const repairCost = parseFloat(req.body.repair_cost);
     const status = req.body.status || 'masuk'; // default: proses
-    const userId = parseInt(req.userId); // User yang membuat
 
     // VALIDASI CUSTOMER EXISTS by UUID
     const customerExists = await prisma.customer.findUnique({
@@ -49,7 +49,7 @@ const createRepair = async (req, res) => {
     }
 
     // VALIDASI DP
-    if (dp > repairCost) {
+    if (dp >= repairCost) {
       return res.status(422).json({
         meta: {
           success: false,
@@ -81,6 +81,7 @@ const createRepair = async (req, res) => {
     // 1. Simpan transaksi perbaikan
     const repair = await prisma.repair.create({
       data: {
+         cashier_id: cashierId,
         customer_id: customerExists.id,  
         item_repair: itemRepair,
         invoice,
@@ -120,17 +121,15 @@ const createRepair = async (req, res) => {
       }
     });
 
-    // 2. Create initial tracking record
     await prisma.repairTracking.create({
       data: {
         repair_id: repair.id,
         status: status,
         notes: `Perbaikan ${itemRepair} dibuat dengan status ${status}`,
-        updated_by: userId,
+        updated_by: cashierId,
       }
     });
 
-    // 3. Simpan profit untuk perbaikan
     await prisma.profit.create({
       data: {
         repair_id: repair.id,
@@ -141,7 +140,6 @@ const createRepair = async (req, res) => {
 
     const { id, ...repairResponse } = repair;
 
-    // Response sukses
     res.status(201).json({
       meta: {
         success: true,
@@ -162,7 +160,6 @@ const createRepair = async (req, res) => {
   }
 };
 
-// Fungsi untuk mengambil semua data perbaikan dengan pagination dan search
 const getRepairs = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -211,6 +208,12 @@ const getRepairs = async (req, res) => {
             address: true,
           }
         },
+         cashier: { 
+          select: {
+            uuid: true,
+            name: true,
+          }
+        },
       },
       skip: (page - 1) * perPage,
       take: perPage,
@@ -242,7 +245,6 @@ const getRepairs = async (req, res) => {
   }
 };
 
-// Fungsi untuk mengambil detail perbaikan berdasarkan UUID
 const getRepairById = async (req, res) => {
   try {
     const { uuid } = req.params;
@@ -275,11 +277,24 @@ const getRepairById = async (req, res) => {
             address: true,
           }
         },
-        trackings: { // NEW: Include tracking history
+        cashier: { 
+          select: {
+            uuid: true,
+            name: true,
+            email: true,
+          }
+        },
+        trackings: { 
           select: {
             status: true,
             notes: true,
             created_at: true,
+            user: { 
+              select: {
+                uuid: true,
+                name: true,
+              }
+            }
           },
           orderBy: {
             created_at: 'asc'
@@ -317,7 +332,6 @@ const getRepairById = async (req, res) => {
   }
 };
 
-// Fungsi untuk mengambil detail perbaikan berdasarkan invoice
 const getRepairByInvoice = async (req, res) => {
   try {
     const invoice = req.params.invoice;
@@ -354,7 +368,14 @@ const getRepairByInvoice = async (req, res) => {
             address: true,
           }
         },
-        trackings: { // NEW: Include tracking history
+        cashier: { 
+          select: {
+            uuid: true,
+            name: true,
+            email: true,
+          }
+        },
+        trackings: { 
           select: {
             status: true,
             notes: true,
@@ -390,7 +411,6 @@ const getRepairByInvoice = async (req, res) => {
   }
 };
 
-// NEW: Get tracking by invoice (Public)
 const getRepairTrackingByInvoice = async (req, res) => {
   try {
     const { invoice } = req.params;
@@ -463,7 +483,6 @@ const getRepairTrackingByInvoice = async (req, res) => {
   }
 };
 
-// Fungsi untuk generate invoice baru
 const getNewRepairInvoice = async (req, res) => {
   try {
     const invoice = await generateUniqueRepairInvoice();
@@ -481,7 +500,6 @@ const getNewRepairInvoice = async (req, res) => {
   }
 };
 
-// Update repair by UUID
 const updateRepair = async (req, res) => {
   try {
     const { uuid } = req.params;
@@ -633,13 +651,11 @@ const updateRepair = async (req, res) => {
       }
     });
 
-    // Update profit jika repair_cost berubah
     await prisma.profit.updateMany({
       where: { repair_id: existingRepair.id },
       data: { total: repairCost },
     });
 
-    // Remove id dari response
     const { id, ...repairResponse } = updatedRepair;
 
     res.status(200).json({
@@ -666,7 +682,7 @@ const updateRepairStatus = async (req, res) => {
   try {
     const { uuid } = req.params;
     const { status, notes } = req.body;
-    const userId = parseInt(req.userId);
+    const cashierId = parseInt(req.userId);
 
     console.log("Updating repair status with UUID:", uuid);
     console.log("New status:", status);
@@ -683,12 +699,12 @@ const updateRepairStatus = async (req, res) => {
     }
 
     // VALIDASI STATUS
-    const validStatuses = ['proses', 'dikerjakan', 'selesai'];
+    const validStatuses = ['masuk', 'dikerjakan', 'selesai'];
     if (!status || !validStatuses.includes(status)) {
       return res.status(422).json({
         meta: {
           success: false,
-          message: "Status harus: proses, dikerjakan, atau selesai",
+          message: "Status harus: masuk, dikerjakan, atau selesai",
         },
       });
     }
@@ -712,7 +728,7 @@ const updateRepairStatus = async (req, res) => {
         repair_id: updatedRepair.id,
         status: status,
         notes: notes || `Status diubah menjadi ${status}`,
-        updated_by: userId,
+        updated_by: cashierId,
       }
     });
 
@@ -741,7 +757,6 @@ const updateRepairStatus = async (req, res) => {
   }
 };
 
-// Fungsi untuk menghapus data perbaikan by UUID
 const deleteRepair = async (req, res) => {
   try {
     const { uuid } = req.params;
@@ -758,12 +773,10 @@ const deleteRepair = async (req, res) => {
       });
     }
 
-    // Hapus data perbaikan (cascade akan handle tracking & profit)
     await prisma.repair.delete({
       where: { uuid },
     });
 
-    // Hapus file image jika ada
     if (repair.image && fs.existsSync(repair.image)) {
       fs.unlinkSync(repair.image);
     }
@@ -793,5 +806,5 @@ module.exports = {
   updateRepair,  
   updateRepairStatus,
   deleteRepair,
-  getRepairTrackingByInvoice, // NEW
+  getRepairTrackingByInvoice, 
 };

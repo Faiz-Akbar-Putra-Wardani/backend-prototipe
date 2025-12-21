@@ -87,7 +87,7 @@ const createTransaction = async (req, res) => {
         }
 
         // VALIDASI DP
-        if (dp > grandTotal) {
+        if (dp >= grandTotal) {
           return res.status(422).json({
             meta: {
               success: false,
@@ -108,7 +108,7 @@ const createTransaction = async (req, res) => {
         //  VALIDASI NEGO
         const maxNego = subtotalPlusExtra - pphNominal;
 
-        if (nego > maxNego) {
+        if (nego >= maxNego) {
             return res.status(422).json({
               meta: {
                 success: false,
@@ -309,7 +309,7 @@ const updateTransaction = async (req, res) => {
     }
 
     // VALIDASI DP
-    if (dp > grandTotal) {
+    if (dp >= grandTotal) {
       return res.status(422).json({
         meta: {
           success: false,
@@ -330,7 +330,7 @@ const updateTransaction = async (req, res) => {
     // VALIDASI NEGO
     const maxNego = subtotalPlusExtra - pphNominal;
 
-    if (nego > maxNego) {
+    if (nego >= maxNego) {
       return res.status(422).json({
         meta: {
           success: false,

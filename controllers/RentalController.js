@@ -8,11 +8,10 @@ const { diffMonths } = require("../utils/date");
 const createRental = async (req, res) => {
   try {
     const invoice = await generateUniqueRentalInvoice();
-
+    const cashierId = parseInt(req.userId);
     const customerUuid = req.body.customer_id;
     const dp = Number(req.body.dp || 0);
-    const status = req.body.status ?? "proses"; // Changed default to 'proses'
-    const userId = parseInt(req.userId); // User yang membuat
+    const status = req.body.status ?? "proses"; 
 
     // VALIDASI CUSTOMER EXISTS by UUID
     const customerExists = await prisma.customer.findUnique({
@@ -83,6 +82,7 @@ const createRental = async (req, res) => {
     // 1. Create rental
     const rental = await prisma.rental.create({
       data: {
+         cashier_id: cashierId,
         customer_id: customerExists.id,
         invoice,
         dp,
@@ -97,7 +97,7 @@ const createRental = async (req, res) => {
         rental_id: rental.id,
         status: status,
         notes: `Penyewaan dibuat dengan status ${status}`,
-        updated_by: userId,
+        updated_by: cashierId,
       }
     });
 
@@ -138,7 +138,7 @@ const createRental = async (req, res) => {
     }
 
     // Validasi DP
-    if (dp > totalRent) {
+    if (dp >= totalRent) {
       await prisma.rentalDetail.deleteMany({ where: { rental_id: rental.id } });
       await prisma.profit.deleteMany({ where: { rental_id: rental.id } });
       await prisma.rentalTracking.deleteMany({ where: { rental_id: rental.id } });
@@ -343,7 +343,7 @@ const updateRental = async (req, res) => {
     }
 
     // Validasi DP
-    if (dp > totalRent) {
+    if (dp >= totalRent) {
       return res.status(422).json({ 
         meta: {
           success: false,
@@ -432,6 +432,12 @@ const getRentals = async (req, res) => {
             address: true,
           }
         },
+        cashier: { // TAMBAHKAN INI (opsional untuk list)
+          select: {
+            uuid: true,
+            name: true,
+          }
+        },
         details: {
           select: {
             id: true,
@@ -502,6 +508,13 @@ const getRentalById = async (req, res) => {
             address: true,
           }
         },
+        cashier: { 
+          select: {
+            uuid: true,
+            name: true,
+            email: true,
+          }
+        },
         details: {
           select: {
             id: true,
@@ -518,11 +531,17 @@ const getRentalById = async (req, res) => {
             },
           },
         },
-        trackings: { // NEW: Include tracking history
+        trackings: { 
           select: {
             status: true,
             notes: true,
             created_at: true,
+            user: { 
+              select: {
+                uuid: true,
+                name: true,
+              }
+            }
           },
           orderBy: {
             created_at: 'asc'
@@ -579,6 +598,13 @@ const getRentalByInvoice = async (req, res) => {
             address: true,
           }
         },
+         cashier: { // TAMBAHKAN INI - untuk print invoice
+          select: {
+            uuid: true,
+            name: true,
+            email: true,
+          }
+        },
         details: {
           select: {
             id: true,
@@ -601,6 +627,11 @@ const getRentalByInvoice = async (req, res) => {
             status: true,
             notes: true,
             created_at: true,
+            user: { // TAMBAHKAN INI - Info user yang update status
+              select: {
+                name: true,
+              }
+            }
           },
           orderBy: {
             created_at: 'asc'
@@ -732,7 +763,7 @@ const updateRentalStatus = async (req, res) => {
   try {
     const { uuid } = req.params;
     const { status, notes } = req.body;
-    const userId = parseInt(req.userId);
+    const cashierId = parseInt(req.userId);
 
     console.log("Updating rental status with UUID:", uuid);
     console.log("New status:", status);
@@ -784,7 +815,7 @@ const updateRentalStatus = async (req, res) => {
         rental_id: rental.id,
         status: status,
         notes: notes || `Status diubah menjadi ${status}`,
-        updated_by: userId,
+        updated_by: cashierId,
       }
     });
 
