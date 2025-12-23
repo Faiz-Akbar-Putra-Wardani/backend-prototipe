@@ -129,12 +129,10 @@ model Transaction {
   customer_id         Int?
   invoice             String                  @unique
   subtotal            Float 
-  subtotalPlusExtra   Float                   @map("subExtraValue") 
-  extra               Float?                  @default(0)
   dp                  Float
   nego                Float
-  pph                 Float?                  @default(0)
-  pph_nominal         Float?                  @default(0)
+  ppn                 Float?                  @default(0)
+  ppn_nominal         Float?                  @default(0)
   grand_total         Float
   status              String                  // proses, dikirim, selesai
   created_at          DateTime                @default(now())
@@ -247,6 +245,13 @@ model Repair {
   pic             String   
   dp              Float?           @default(0)
   repair_cost     Float
+
+// Tambahan baru:
+  extra           Float?           @default(0)     // tambahan biaya (misal 50.000)
+  pph             Float?           @default(0)     // persen PPH (2.5, 2, dll)
+  pph_nominal     Float?           @default(0)     // nilai PPH rupiah
+  grand_total     Float            // total akhir setelah PPH
+
   status          String           // proses, dikerjakan, selesai
   created_at      DateTime         @default(now())
   updated_at      DateTime         @updatedAt

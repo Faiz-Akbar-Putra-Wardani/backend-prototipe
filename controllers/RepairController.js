@@ -8,62 +8,57 @@ const { generateUniqueRepairInvoice } = require('../utils/generateUniqueRepair')
 // Fungsi untuk membuat transaksi perbaikan
 const createRepair = async (req, res) => {
   try {
-    // Generate invoice repair
     const invoice = await generateUniqueRepairInvoice();
 
-    // Input dari frontend
     const cashierId = parseInt(req.userId);
-    const customerUuid = req.body.customer_id;  
+    const customerUuid = req.body.customer_id;
     const itemRepair = req.body.item_repair;
     const startDate = new Date(req.body.start_date);
     const endDate = new Date(req.body.end_date);
     const description = req.body.description;
     const component = req.body.component || null;
     const pic = req.body.pic;
-    const dp = parseFloat(req.body.dp) || 0;
-    const repairCost = parseFloat(req.body.repair_cost);
-    const status = req.body.status || 'masuk'; // default: proses
 
-    // VALIDASI CUSTOMER EXISTS by UUID
+    const dp = parseFloat(req.body.dp) || 0;
+    const repairCost = parseFloat(req.body.repair_cost) || 0;   // biaya dasar
+    const extra = parseFloat(req.body.extra) || 0;              // tambahan biaya
+    const pph = parseFloat(req.body.pph) || 0;                  // persen PPH
+
+    const status = req.body.status || 'masuk';
+
+    // VALIDASI CUSTOMER
     const customerExists = await prisma.customer.findUnique({
-      where: { uuid: customerUuid }  
+      where: { uuid: customerUuid }
     });
 
     if (!customerExists) {
       return res.status(404).json({
-        meta: {
-          success: false,
-          message: "Customer tidak ditemukan",
-        },
+        meta: { success: false, message: "Customer tidak ditemukan" },
       });
     }
 
     // VALIDASI TANGGAL
     if (endDate < startDate) {
       return res.status(422).json({
-        meta: {
-          success: false,
-          message: "Tanggal selesai harus setelah tanggal mulai",
-        },
+        meta: { success: false, message: "Tanggal selesai harus setelah tanggal mulai" },
       });
     }
 
+    // HITUNG TOTAL (sama seperti composable)
+    const subtotalPlusExtra = repairCost + extra;     // 1.900.000 + 50.000 = 1.950.000
+    const pphNominal = subtotalPlusExtra * (pph / 100); // 1.950.000 * 2.5% = 48.750
+    const grandTotal = subtotalPlusExtra - pphNominal;  // 1.901.250
+
     // VALIDASI DP
-    if (dp >= repairCost) {
+    if (dp >= grandTotal) {
       return res.status(422).json({
-        meta: {
-          success: false,
-          message: "DP tidak boleh melebihi total biaya perbaikan",
-        },
+        meta: { success: false, message: "DP tidak boleh melebihi total biaya perbaikan" },
       });
     }
 
     if (dp < 0) {
       return res.status(422).json({
-        meta: {
-          success: false,
-          message: "DP tidak boleh kurang dari 0",
-        },
+        meta: { success: false, message: "DP tidak boleh kurang dari 0" },
       });
     }
 
@@ -71,18 +66,15 @@ const createRepair = async (req, res) => {
     const validStatuses = ['masuk', 'dikerjakan', 'selesai'];
     if (!validStatuses.includes(status)) {
       return res.status(422).json({
-        meta: {
-          success: false,
-          message: "Status harus: masuk, dikerjakan, atau selesai",
-        },
+        meta: { success: false, message: "Status harus: masuk, dikerjakan, atau selesai" },
       });
     }
 
-    // 1. Simpan transaksi perbaikan
+    // SIMPAN
     const repair = await prisma.repair.create({
       data: {
-         cashier_id: cashierId,
-        customer_id: customerExists.id,  
+        cashier_id: cashierId,
+        customer_id: customerExists.id,
         item_repair: itemRepair,
         invoice,
         start_date: startDate,
@@ -93,6 +85,10 @@ const createRepair = async (req, res) => {
         pic,
         dp,
         repair_cost: repairCost,
+        extra,
+        pph,
+        pph_nominal: pphNominal,
+        grand_total: grandTotal,
         status,
       },
       select: {
@@ -109,6 +105,10 @@ const createRepair = async (req, res) => {
         pic: true,
         dp: true,
         repair_cost: true,
+        extra: true,
+        pph: true,
+        pph_nominal: true,
+        grand_total: true,
         status: true,
         created_at: true,
         updated_at: true,
@@ -124,7 +124,7 @@ const createRepair = async (req, res) => {
     await prisma.repairTracking.create({
       data: {
         repair_id: repair.id,
-        status: status,
+        status,
         notes: `Perbaikan ${itemRepair} dibuat dengan status ${status}`,
         updated_by: cashierId,
       }
@@ -133,7 +133,7 @@ const createRepair = async (req, res) => {
     await prisma.profit.create({
       data: {
         repair_id: repair.id,
-        total: repairCost,
+        total: grandTotal, 
         source: "perbaikan",
       },
     });
@@ -141,24 +141,19 @@ const createRepair = async (req, res) => {
     const { id, ...repairResponse } = repair;
 
     res.status(201).json({
-      meta: {
-        success: true,
-        message: "Transaksi perbaikan berhasil dibuat",
-      },
+      meta: { success: true, message: "Transaksi perbaikan berhasil dibuat" },
       data: repairResponse,
     });
 
   } catch (error) {
     console.error("Error in createRepair:", error);
     res.status(500).json({
-      meta: {
-        success: false,
-        message: "Terjadi kesalahan pada server",
-      },
+      meta: { success: false, message: "Terjadi kesalahan pada server" },
       errors: [{ msg: error.message, path: "general" }],
     });
   }
 };
+
 
 const getRepairs = async (req, res) => {
   try {
@@ -197,6 +192,10 @@ const getRepairs = async (req, res) => {
         pic: true,
         dp: true,
         repair_cost: true,
+        extra: true,
+        pph: true,
+        pph_nominal: true,
+        grand_total: true,
         status: true,
         created_at: true,
         updated_at: true,
@@ -265,6 +264,10 @@ const getRepairById = async (req, res) => {
         image: true,
         pic: true,
         dp: true,
+        extra: true,
+        pph: true,
+        pph_nominal: true,
+        grand_total: true,
         repair_cost: true,
         status: true,
         created_at: true,
@@ -356,6 +359,10 @@ const getRepairByInvoice = async (req, res) => {
         image: true,
         pic: true,
         dp: true,
+        extra: true,
+        pph: true,
+        pph_nominal: true,
+        grand_total: true,
         repair_cost: true,
         status: true,
         created_at: true,
@@ -430,6 +437,10 @@ const getRepairTrackingByInvoice = async (req, res) => {
         invoice: true,
         item_repair: true,
         repair_cost: true,
+        extra: true,
+        pph: true,
+        pph_nominal: true,
+        grand_total: true,
         status: true,
         start_date: true,
         end_date: true,
@@ -504,13 +515,10 @@ const updateRepair = async (req, res) => {
   try {
     const { uuid } = req.params;
 
-    console.log("Updating repair with UUID:", uuid);
-
     const existingRepair = await prisma.repair.findUnique({
       where: { uuid },
       select: {
-        id: true,  
-        uuid: true,
+        id: true,
         image: true,
       }
     });
@@ -521,85 +529,69 @@ const updateRepair = async (req, res) => {
       });
     }
 
-    // Input dari frontend
-    const customerUuid = req.body.customer_id; 
+    const customerUuid = req.body.customer_id;
     const itemRepair = req.body.item_repair;
     const startDate = new Date(req.body.start_date);
     const endDate = new Date(req.body.end_date);
     const description = req.body.description;
     const component = req.body.component || null;
     const pic = req.body.pic;
+
     const dp = parseFloat(req.body.dp) || 0;
-    const repairCost = parseFloat(req.body.repair_cost);
+    const repairCost = parseFloat(req.body.repair_cost) || 0;
+    const extra = parseFloat(req.body.extra) || 0;
+    const pph = parseFloat(req.body.pph) || 0;
+
     const status = req.body.status;
 
-    // Validasi wajib
     if (!customerUuid || !itemRepair || !startDate || !endDate || !description || !pic || isNaN(repairCost) || !status) {
       return res.status(400).json({
-        meta: {
-          success: false,
-          message: "Input tidak valid. Periksa kembali data perbaikan.",
-        },
+        meta: { success: false, message: "Input tidak valid. Periksa kembali data perbaikan." },
       });
     }
 
-    // VALIDASI CUSTOMER EXISTS by UUID
     const customerExists = await prisma.customer.findUnique({
-      where: { uuid: customerUuid }  
+      where: { uuid: customerUuid }
     });
 
     if (!customerExists) {
       return res.status(404).json({
-        meta: {
-          success: false,
-          message: "Customer tidak ditemukan",
-        },
+        meta: { success: false, message: "Customer tidak ditemukan" },
       });
     }
 
-    // VALIDASI TANGGAL
     if (endDate < startDate) {
       return res.status(422).json({
-        meta: {
-          success: false,
-          message: "Tanggal selesai harus setelah tanggal mulai",
-        },
+        meta: { success: false, message: "Tanggal selesai harus setelah tanggal mulai" },
       });
     }
 
-    // VALIDASI DP
-    if (dp > repairCost) {
+    // HITUNG TOTAL
+    const subtotalPlusExtra = repairCost + extra;
+    const pphNominal = subtotalPlusExtra * (pph / 100);
+    const grandTotal = subtotalPlusExtra - pphNominal;
+
+    if (dp > grandTotal) {
       return res.status(422).json({
-        meta: {
-          success: false,
-          message: "DP tidak boleh melebihi total biaya perbaikan",
-        },
+        meta: { success: false, message: "DP tidak boleh melebihi total biaya perbaikan" },
       });
     }
 
     if (dp < 0) {
       return res.status(422).json({
-        meta: {
-          success: false,
-          message: "DP tidak boleh kurang dari 0",
-        },
+        meta: { success: false, message: "DP tidak boleh kurang dari 0" },
       });
     }
 
-    // VALIDASI STATUS
     const validStatuses = ['masuk', 'dikerjakan', 'selesai'];
     if (!validStatuses.includes(status)) {
       return res.status(422).json({
-        meta: {
-          success: false,
-          message: "Status harus: masuk, dikerjakan, atau selesai",
-        },
+        meta: { success: false, message: "Status harus: masuk, dikerjakan, atau selesai" },
       });
     }
 
-    // Prepare data update
     const dataRepair = {
-      customer_id: customerExists.id,  
+      customer_id: customerExists.id,
       item_repair: itemRepair,
       start_date: startDate,
       end_date: endDate,
@@ -608,20 +600,21 @@ const updateRepair = async (req, res) => {
       pic,
       dp,
       repair_cost: repairCost,
+      extra,
+      pph,
+      pph_nominal: pphNominal,
+      grand_total: grandTotal,
       status,
     };
 
-    // Handle image upload jika ada file baru
     if (req.file) {
       dataRepair.image = req.file.path;
 
-      // Hapus gambar lama jika ada
       if (existingRepair.image && fs.existsSync(existingRepair.image)) {
         fs.unlinkSync(existingRepair.image);
       }
     }
 
-    // Update data perbaikan
     const updatedRepair = await prisma.repair.update({
       where: { uuid },
       data: dataRepair,
@@ -639,6 +632,10 @@ const updateRepair = async (req, res) => {
         pic: true,
         dp: true,
         repair_cost: true,
+        extra: true,
+        pph: true,
+        pph_nominal: true,
+        grand_total: true,
         status: true,
         created_at: true,
         updated_at: true,
@@ -653,30 +650,25 @@ const updateRepair = async (req, res) => {
 
     await prisma.profit.updateMany({
       where: { repair_id: existingRepair.id },
-      data: { total: repairCost },
+      data: { total: grandTotal },
     });
 
     const { id, ...repairResponse } = updatedRepair;
 
     res.status(200).json({
-      meta: {
-        success: true,
-        message: "Data perbaikan berhasil diperbarui",
-      },
+      meta: { success: true, message: "Data perbaikan berhasil diperbarui" },
       data: repairResponse,
     });
 
   } catch (error) {
     console.error("Error in updateRepair:", error);
     res.status(500).json({
-      meta: {
-        success: false,
-        message: "Terjadi kesalahan pada server",
-      },
+      meta: { success: false, message: "Terjadi kesalahan pada server" },
       errors: [{ msg: error.message, path: "general" }],
     });
   }
 };
+
 
 const updateRepairStatus = async (req, res) => {
   try {
