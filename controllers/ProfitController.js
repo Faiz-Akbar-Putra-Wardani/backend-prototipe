@@ -427,7 +427,7 @@ const getRecentTransactions = async (req, res) => {
         else if (profit.source === 'sewa' && profit.rental) {
           transactionData.invoice = profit.rental.invoice || 'N/A';
           transactionData.customer = profit.rental.customer?.name_perusahaan || 'Unknown';
-          transactionData.status = profit.rental.status || 'berlangsung';
+          transactionData.status = profit.rental.status || 'proses';
           
           transactionData.items = (profit.rental.details || []).map(d => ({
             name: d.product?.title || 'Unknown Product',
