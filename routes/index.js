@@ -616,6 +616,14 @@ const routes = [
     middlewares: [verifyToken],
     handler: reportController.getTransactionStats
   },
+ 
+  {
+    method: 'get',
+    path: '/reports/customer-recap/export',
+    middlewares: [verifyToken],
+    handler: reportController.exportCustomerRecap
+  },
+
   {
     method: "delete",
     path: "/reports/:id",
