@@ -12,7 +12,7 @@ const login = async (req, res) => {
         name: true,
         email: true,
         password: true,
-        role: true, // ← TAMBAHKAN INI untuk ambil role dari database
+        role: true, 
       },
     });
 
@@ -30,11 +30,10 @@ const login = async (req, res) => {
       });
     }
 
-    // ← TAMBAHKAN role di JWT token (opsional tapi recommended)
     const token = jwt.sign(
       { 
         id: user.id,
-        role: user.role // ← Simpan role di JWT
+        role: user.role 
       }, 
       process.env.JWT_SECRET, 
       {
@@ -47,7 +46,7 @@ const login = async (req, res) => {
     return res.status(200).json({
       meta: { success: true, message: "Login successful" },
       data: {
-        user: userWithoutPassword, // ← Sekarang termasuk role
+        user: userWithoutPassword, 
         token,
       },
     });

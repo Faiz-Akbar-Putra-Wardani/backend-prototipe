@@ -103,7 +103,7 @@ const createCart = async (req, res) => {
         //  Memeriksa apakah item keranjang sudah ada (gunakan ID internal)
         const existingCart = await prisma.cart.findFirst({
             where: {
-                product_id: product.id, // ✅ Gunakan ID internal
+                product_id: product.id, 
                 cashier_id: parseInt(req.userId),
             },
         });
