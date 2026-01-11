@@ -2,9 +2,9 @@ const { body } = require('express-validator');
 
 const validateRental = [
 
-  body("total_rent_price")
-    .notEmpty().withMessage("total sewa wajib diisi")
-    .isFloat({ gt: 0 }).withMessage("total sewa harus angka dan lebih besar dari 0"),
+  // body("total_rent_price")
+  //   .notEmpty().withMessage("total sewa wajib diisi")
+  //   .isFloat({ gt: 0 }).withMessage("total sewa harus angka dan lebih besar dari 0"),
 
   body("dp")
     .optional()
