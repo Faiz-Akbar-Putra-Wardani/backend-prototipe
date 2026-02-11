@@ -310,7 +310,7 @@ const exportCustomerRecap = async (req, res) => {
         invoice: item.invoice,
         perusahaan: item.perusahaan,
         type: item.type.toUpperCase(),
-        total: `Rp ${moneyFormat(item.total)}`,
+        total: ` ${moneyFormat(item.total)}`,
       });
 
       // Style data rows
@@ -342,7 +342,7 @@ const exportCustomerRecap = async (req, res) => {
       invoice: '',
       perusahaan: 'TOTAL',
       type: '',
-      total: `Rp ${moneyFormat(totalAmount)}`,
+      total: ` ${moneyFormat(totalAmount)}`,
     });
 
     // Style total row
