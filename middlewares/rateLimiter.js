@@ -2,7 +2,7 @@ const rateLimit = require("express-rate-limit");
 
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 500, //100
   message: 'Terlalu banyak permintaan, silahkan coba lagi nanti',
   standardHeaders: true, 
   legacyHeaders: false,
@@ -17,13 +17,13 @@ const loginLimiter = rateLimit({
 
 const crudLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 30,
+  max: 60, //30
   message: 'Terlalu banyak request, tunggu sebentar',
 });
 
 const publicLimiter = rateLimit({
  windowMs: 5 * 60 * 1000, 
-  max: 100, 
+  max: 500, //100
   message: 'Terlalu banyak request, silahkan tunggu sebentar',
   standardHeaders: true,
   legacyHeaders: false,
@@ -31,7 +31,7 @@ const publicLimiter = rateLimit({
 
 const trackingLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, 
-  max: 20,
+  max: 70, //20
   message: 'Terlalu banyak pengecekan tracking, tunggu sebentar',
 });
 
