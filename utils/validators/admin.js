@@ -2,6 +2,7 @@ const { body } = require('express-validator');
 const prisma = require("../../prisma/client");
 
 const validateCreateAdmin = [
+    // ... (bagian create biarkan saja, sudah benar) ...
     body('name')
         .notEmpty().withMessage('Nama tidak boleh kosong')
         .isLength({ min: 3 }).withMessage('Nama minimal 3 karakter'),
@@ -28,6 +29,7 @@ const validateCreateAdmin = [
         .isIn(['admin', 'super_admin']).withMessage('Role harus admin atau super_admin'),
 ];
 
+// PERBAIKAN DI SINI
 const validateUpdateAdmin = [
     body('name')
         .optional()
@@ -41,10 +43,11 @@ const validateUpdateAdmin = [
                 where: { 
                     email: value,
                     NOT: {
-                        id: Number(req.params.id)
+                        uuid: req.params.uuid 
                     }
                 }
             });
+
             if (existingUser) {
                 throw new Error('Email sudah digunakan oleh admin lain');
             }
